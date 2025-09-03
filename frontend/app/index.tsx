@@ -45,8 +45,8 @@ export default function Index() {
   const shadowOpacity = useRef(new Animated.Value(0)).current;
 
   // Audio refs
-  const [musicSound, setMusicSound] = useState<Audio.Sound | null>(null);
-  const [instructorVoice, setInstructorVoice] = useState<Audio.Sound | null>(null);
+  const [musicSound, setMusicSound] = useState<any>(null);
+  const [instructorVoice, setInstructorVoice] = useState<any>(null);
 
   // Move definitions
   const moves = {
@@ -60,10 +60,10 @@ export default function Index() {
     return () => {
       // Cleanup audio on unmount
       if (musicSound) {
-        musicSound.unloadAsync();
+        musicSound.unloadAsync?.();
       }
       if (instructorVoice) {
-        instructorVoice.unloadAsync();
+        instructorVoice.unloadAsync?.();
       }
     };
   }, [musicSound, instructorVoice]);
