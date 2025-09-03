@@ -10,7 +10,6 @@ from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
 import base64
-import httpx
 import asyncio
 
 ROOT_DIR = Path(__file__).parent
