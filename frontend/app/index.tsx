@@ -10,7 +10,7 @@ import {
   Alert 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Audio } from 'expo-av';
+import { Audio } from 'expo-audio';
 import * as KeepAwake from 'expo-keep-awake';
 
 const { width, height } = Dimensions.get('window');
