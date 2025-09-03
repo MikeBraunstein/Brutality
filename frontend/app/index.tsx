@@ -113,16 +113,17 @@ export default function Index() {
 
   const startWorkout = async () => {
     try {
-      // Enable keep awake during workout
-      try {
-        KeepAwake.activateKeepAwakeAsync();
-      } catch (error) {
-        console.log('Keep awake permission denied:', error);
-        // Continue without keep awake if permission denied
-      }
+      console.log('Starting workout...');
 
+      // Enable keep awake during workout (non-blocking)
+      KeepAwake.activateKeepAwakeAsync().catch(error => {
+        console.log('Keep awake permission denied, continuing without it:', error);
+      });
+
+      console.log('Triggering logo animation...');
       animateLogo();
       
+      console.log('Setting workout state...');
       // Start workout
       setWorkoutState(prev => ({
         ...prev,
@@ -133,6 +134,7 @@ export default function Index() {
         intensityScore: 0.0
       }));
 
+      console.log('Starting welcome message...');
       // Play welcome message and start workout
       await playWelcomeMessage();
       
