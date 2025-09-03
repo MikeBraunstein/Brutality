@@ -26,9 +26,6 @@ app = FastAPI(title="Brutality Fitness API", version="1.0.0")
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
-# Emergent LLM Key for OpenAI TTS
-EMERGENT_LLM_KEY = "sk-emergent-808612d9894D45735C"
-
 # Models
 class WorkoutSession(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
