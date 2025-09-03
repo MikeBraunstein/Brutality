@@ -211,17 +211,29 @@ export default function Index() {
 
   const playWelcomeMessage = async () => {
     try {
-      // This will be replaced with actual AI TTS
-      console.log('Playing welcome message: "Welcome to Brutality, an exercise routine not for the faint of heart."');
+      const welcomeText = "Welcome to Brutality, an exercise routine not for the faint of heart.";
+      console.log('Playing welcome message:', welcomeText);
+      
+      // Generate TTS for welcome message
+      try {
+        const ttsResponse = await BrutalityAPI.generateTTS({
+          text: welcomeText,
+          voice: 'onyx', // Deep male voice
+          speed: 1.0
+        });
+        console.log('TTS generated successfully');
+        // TODO: Play the audio from ttsResponse.audio_base64
+      } catch (error) {
+        console.error('TTS generation failed:', error);
+      }
       
       // Start background music (placeholder)
-      // In real implementation, this would load techno house music
       console.log('Starting techno house background music');
       
       // Start first round after welcome
       setTimeout(() => {
         startRound(1);
-      }, 3000);
+      }, 4000);
       
     } catch (error) {
       console.error('Error playing welcome message:', error);
@@ -231,97 +243,66 @@ export default function Index() {
   const startRound = (roundNumber: number) => {
     console.log(`Starting round ${roundNumber}`);
     
-    setWorkoutState(prev => ({
-      ...prev,
-      currentRound: roundNumber,
-      timeRemaining: 300, // 5 minutes
-      isBreak: false,
-      complexityScore: 0.0,
-      intensityScore: roundNumber === 1 ? 0.1 : prev.intensityScore + 0.1
-    }));
-
-    // Start calling moves
+    // Start calling moves immediately
     setTimeout(() => {
       callNextMove();
-    }, 1000);
+    }, 2000);
   };
 
-  const callNextMove = () => {
-    const { complexityScore, intensityScore, currentRound } = workoutState;
-    
-    // Generate move based on complexity and intensity
-    let moveCall = '';
-    let moveDuration = 0;
-
-    if (complexityScore === 0.0) {
-      // Single number call
-      const moveNumber = Math.floor(Math.random() * 4) + 1;
-      moveCall = moveNumber.toString();
-      moveDuration = moveNumber * 1000 + 1500; // Each move = 1 second + 1.5 second pause
-    } else if (complexityScore <= 0.4) {
-      // Defense + move combinations
-      if (Math.random() < intensityScore) {
-        const moveNumber = Math.floor(Math.random() * 4) + 1;
-        moveCall = `Defense and ${moveNumber}`;
-        moveDuration = 1500 + (moveNumber * 1000) + 1500; // Defense + moves + pause
-      } else {
-        const moveNumber = Math.floor(Math.random() * 4) + 1;
-        moveCall = moveNumber.toString();
-        moveDuration = moveNumber * 1000 + 1500;
-      }
-    } else {
-      // Complex combinations and broken combos
-      if (Math.random() < 0.5) {
-        // Broken combo (call individual moves instead of numbers)
-        const moves = ['Left straight', 'Right straight', 'Left hook', 'Right uppercut'];
-        const combo = [];
-        const numMoves = Math.floor(Math.random() * 3) + 2;
-        
-        if (Math.random() < intensityScore) {
-          combo.push('Defense');
-        }
-        
-        for (let i = 0; i < numMoves; i++) {
-          combo.push(moves[Math.floor(Math.random() * moves.length)]);
-        }
-        
-        moveCall = combo.join(', ');
-        moveDuration = combo.length * 1500; // 1.5 seconds per move
-      } else {
-        // Regular combination
-        const moveNumber = Math.floor(Math.random() * 4) + 1;
-        if (Math.random() < intensityScore) {
-          moveCall = `Defense and ${moveNumber}`;
-          moveDuration = 1500 + (moveNumber * 1000) + 1500;
-        } else {
-          moveCall = moveNumber.toString();
-          moveDuration = moveNumber * 1000 + 1500;
-        }
-      }
+  const callNextMove = async () => {
+    if (!workoutState.isActive || workoutState.isBreak) {
+      return;
     }
 
-    console.log(`Instructor calls: ${moveCall}`);
-    
-    setWorkoutState(prev => ({
-      ...prev,
-      currentMove: moveCall,
-      moveTimeRemaining: moveDuration
-    }));
+    try {
+      // Generate move command from backend
+      const moveCommand = await BrutalityAPI.generateMoveCommand(
+        workoutState.complexityScore,
+        workoutState.intensityScore,
+        workoutState.currentRound
+      );
 
-    // Increase complexity gradually during round
-    setTimeout(() => {
+      console.log(`Instructor calls: ${moveCommand.command}`);
+      
+      // Generate TTS for the move command
+      try {
+        const ttsResponse = await BrutalityAPI.generateTTS({
+          text: moveCommand.command,
+          voice: 'onyx',
+          speed: 1.2 // Slightly faster for commands
+        });
+        // TODO: Play the audio from ttsResponse.audio_base64
+      } catch (error) {
+        console.error('Move TTS generation failed:', error);
+      }
+      
       setWorkoutState(prev => ({
         ...prev,
-        complexityScore: Math.min(1.0, prev.complexityScore + 0.1)
+        currentMove: moveCommand.command,
+        moveTimeRemaining: moveCommand.duration_ms
       }));
-    }, 30000); // Increase every 30 seconds
 
-    // Schedule next move
-    setTimeout(() => {
-      if (workoutState.isActive && !workoutState.isBreak) {
-        callNextMove();
+      // Increase complexity gradually during round (every 30 seconds)
+      if (workoutState.timeRemaining % 30 === 0) {
+        setWorkoutState(prev => ({
+          ...prev,
+          complexityScore: Math.min(1.0, prev.complexityScore + 0.1)
+        }));
       }
-    }, moveDuration);
+
+      // Schedule next move
+      moveTimer.current = setTimeout(() => {
+        callNextMove();
+      }, moveCommand.duration_ms);
+
+    } catch (error) {
+      console.error('Error generating move command:', error);
+      
+      // Fallback to local move generation
+      setTimeout(() => {
+        callNextMove();
+      }, 3000);
+    }
   };
 
   const logoGlowColor = logoGlow.interpolate({
