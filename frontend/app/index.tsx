@@ -23,6 +23,7 @@ interface WorkoutState {
   intensityScore: number;
   currentMove: string;
   moveTimeRemaining: number;
+  sessionId: string | null;
 }
 
 export default function Index() {
@@ -35,7 +36,8 @@ export default function Index() {
     complexityScore: 0.0,
     intensityScore: 0.0,
     currentMove: '',
-    moveTimeRemaining: 0
+    moveTimeRemaining: 0,
+    sessionId: null
   });
 
   // Animation values
@@ -43,9 +45,9 @@ export default function Index() {
   const logoGlow = useRef(new Animated.Value(0)).current;
   const shadowOpacity = useRef(new Animated.Value(0)).current;
 
-  // Audio refs
-  const [musicSound, setMusicSound] = useState<any>(null);
-  const [instructorVoice, setInstructorVoice] = useState<any>(null);
+  // Timer refs
+  const workoutTimer = useRef<NodeJS.Timeout | null>(null);
+  const moveTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Move definitions
   const moves = {
@@ -55,17 +57,38 @@ export default function Index() {
     4: 'Right uppercut'
   };
 
+  // Timer effect
   useEffect(() => {
+    if (workoutState.isActive && workoutState.timeRemaining > 0) {
+      workoutTimer.current = setTimeout(() => {
+        setWorkoutState(prev => ({
+          ...prev,
+          timeRemaining: prev.timeRemaining - 1
+        }));
+      }, 1000);
+    } else if (workoutState.isActive && workoutState.timeRemaining === 0) {
+      // Round finished, start break or next round
+      handleRoundComplete();
+    }
+
     return () => {
-      // Cleanup audio on unmount
-      if (musicSound) {
-        musicSound.unloadAsync?.();
-      }
-      if (instructorVoice) {
-        instructorVoice.unloadAsync?.();
+      if (workoutTimer.current) {
+        clearTimeout(workoutTimer.current);
       }
     };
-  }, [musicSound, instructorVoice]);
+  }, [workoutState.isActive, workoutState.timeRemaining]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (workoutTimer.current) {
+        clearTimeout(workoutTimer.current);
+      }
+      if (moveTimer.current) {
+        clearTimeout(moveTimer.current);
+      }
+    };
+  }, []);
 
   const animateLogo = () => {
     // Scale animation
