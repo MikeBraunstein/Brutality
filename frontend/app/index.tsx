@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
-import { useKeepAwake } from 'expo-keep-awake';
+import * as KeepAwake from 'expo-keep-awake';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,7 +27,6 @@ interface WorkoutState {
 }
 
 export default function Index() {
-  useKeepAwake(); // Keep screen awake during workout
   
   const [workoutState, setWorkoutState] = useState<WorkoutState>({
     isActive: false,
