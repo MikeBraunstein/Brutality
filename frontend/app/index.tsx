@@ -114,21 +114,25 @@ export default function Index() {
 
   const startWorkout = async () => {
     try {
-      // Request audio permissions
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Audio permission is required for the workout');
-        return;
+      // Enable keep awake during workout
+      try {
+        KeepAwake.activateKeepAwakeAsync();
+      } catch (error) {
+        console.log('Keep awake permission denied:', error);
+        // Continue without keep awake if permission denied
       }
 
-      // Configure audio session
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        staysActiveInBackground: true,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
+      // Request audio permissions using expo-audio
+      try {
+        const { granted } = await Audio.requestPermissionsAsync();
+        if (!granted) {
+          Alert.alert('Permission needed', 'Audio permission is required for the workout');
+          return;
+        }
+      } catch (error) {
+        console.log('Audio permission error:', error);
+        // Continue even if audio permission fails for now
+      }
 
       animateLogo();
       
