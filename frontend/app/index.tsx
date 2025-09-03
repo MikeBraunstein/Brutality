@@ -10,7 +10,7 @@ import {
   Alert 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as KeepAwake from 'expo-keep-awake';
+import { BrutalityAPI } from '../services/api';
 
 const { width, height } = Dimensions.get('window');
 
