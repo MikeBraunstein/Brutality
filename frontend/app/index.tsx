@@ -138,10 +138,12 @@ export default function Index() {
     try {
       console.log('Starting workout...');
 
-      console.log('Triggering logo animation...');
+      // Start workout session with backend
+      const session = await BrutalityAPI.startWorkoutSession('user_1');
+      console.log('Workout session started:', session.id);
+
       animateLogo();
       
-      console.log('Setting workout state...');
       // Start workout
       setWorkoutState(prev => ({
         ...prev,
@@ -149,16 +151,61 @@ export default function Index() {
         currentRound: 1,
         timeRemaining: 300,
         complexityScore: 0.0,
-        intensityScore: 0.1
+        intensityScore: 0.1,
+        sessionId: session.id
       }));
 
-      console.log('Starting welcome message...');
       // Play welcome message and start workout
       await playWelcomeMessage();
       
     } catch (error) {
       console.error('Error starting workout:', error);
       Alert.alert('Error', 'Failed to start workout. Please try again.');
+    }
+  };
+
+  const handleRoundComplete = () => {
+    if (workoutState.currentRound >= 7) {
+      // Workout complete
+      completeWorkout();
+    } else if (workoutState.isBreak) {
+      // Break finished, start next round
+      const nextRound = workoutState.currentRound + 1;
+      setWorkoutState(prev => ({
+        ...prev,
+        currentRound: nextRound,
+        timeRemaining: 300, // 5 minutes
+        isBreak: false,
+        complexityScore: 0.0,
+        intensityScore: Math.min(1.0, prev.intensityScore + 0.1)
+      }));
+      startRound(nextRound);
+    } else {
+      // Round finished, start break
+      setWorkoutState(prev => ({
+        ...prev,
+        timeRemaining: 180, // 3 minutes break
+        isBreak: true,
+        currentMove: 'Break time! Rest and hydrate.'
+      }));
+    }
+  };
+
+  const completeWorkout = async () => {
+    try {
+      if (workoutState.sessionId) {
+        await BrutalityAPI.completeWorkoutSession(workoutState.sessionId);
+      }
+      
+      setWorkoutState(prev => ({
+        ...prev,
+        isActive: false,
+        currentMove: 'Workout Complete! Great job!'
+      }));
+      
+      Alert.alert('Congratulations!', 'You have completed the Brutality workout!');
+    } catch (error) {
+      console.error('Error completing workout:', error);
     }
   };
 
