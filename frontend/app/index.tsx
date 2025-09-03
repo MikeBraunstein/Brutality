@@ -121,18 +121,6 @@ export default function Index() {
         // Continue without keep awake if permission denied
       }
 
-      // Request audio permissions using expo-audio
-      try {
-        const { granted } = await Audio.requestPermissionsAsync();
-        if (!granted) {
-          Alert.alert('Permission needed', 'Audio permission is required for the workout');
-          return;
-        }
-      } catch (error) {
-        console.log('Audio permission error:', error);
-        // Continue even if audio permission fails for now
-      }
-
       animateLogo();
       
       // Start workout
