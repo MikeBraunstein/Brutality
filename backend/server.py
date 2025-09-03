@@ -204,52 +204,40 @@ async def generate_move_command(
 async def generate_speech(request: TTSRequest):
     """Generate text-to-speech audio using OpenAI TTS"""
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.openai.com/v1/audio/speech",
-                headers={
-                    "Authorization": f"Bearer {EMERGENT_LLM_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "tts-1",
-                    "input": request.text,
-                    "voice": request.voice,
-                    "speed": request.speed,
-                    "response_format": "mp3"
-                },
-                timeout=30.0
-            )
-            
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"OpenAI API error: {response.text}"
-                )
-            
-            # Convert audio to base64
-            audio_data = response.content
-            audio_base64 = base64.b64encode(audio_data).decode('utf-8')
-            
-            # Save TTS request to database
-            tts_record = {
-                "id": str(uuid.uuid4()),
-                "text": request.text,
-                "voice": request.voice,
-                "speed": request.speed,
-                "audio_base64": audio_base64,
-                "created_at": datetime.utcnow()
-            }
-            await db.tts_requests.insert_one(tts_record)
-            
-            return TTSResponse(
-                audio_base64=audio_base64,
-                text=request.text,
-                voice=request.voice
-            )
-            
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=408, detail="TTS request timed out")
+        # Initialize Emergent OpenAI client
+        from emergentintegrations import openai
+        emergent_client = openai.EmergentOpenAI()
+        
+        # Generate speech using emergent client
+        response = await emergent_client.audio.speech.create(
+            model="tts-1",
+            input=request.text,
+            voice=request.voice,
+            speed=request.speed,
+            response_format="mp3"
+        )
+        
+        # Convert audio to base64
+        audio_data = response.content
+        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+        
+        # Save TTS request to database
+        tts_record = {
+            "id": str(uuid.uuid4()),
+            "text": request.text,
+            "voice": request.voice,
+            "speed": request.speed,
+            "audio_base64": audio_base64,
+            "created_at": datetime.utcnow()
+        }
+        await db.tts_requests.insert_one(tts_record)
+        
+        return TTSResponse(
+            audio_base64=audio_base64,
+            text=request.text,
+            voice=request.voice
+        )
+        
     except Exception as e:
         logging.error(f"TTS error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generating speech: {str(e)}")
