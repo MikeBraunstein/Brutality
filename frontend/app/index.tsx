@@ -115,11 +115,6 @@ export default function Index() {
     try {
       console.log('Starting workout...');
 
-      // Enable keep awake during workout (non-blocking)
-      KeepAwake.activateKeepAwakeAsync().catch(error => {
-        console.log('Keep awake permission denied, continuing without it:', error);
-      });
-
       console.log('Triggering logo animation...');
       animateLogo();
       
@@ -131,7 +126,7 @@ export default function Index() {
         currentRound: 1,
         timeRemaining: 300,
         complexityScore: 0.0,
-        intensityScore: 0.0
+        intensityScore: 0.1
       }));
 
       console.log('Starting welcome message...');
