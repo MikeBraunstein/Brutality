@@ -104,7 +104,13 @@ const HoldMenu: React.FC<HoldMenuProps> = ({
 
   useEffect(() => {
     if (isVisible) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      // Add error handling for haptics on web platform
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch (error) {
+        // Haptics not supported on web, silently continue
+        console.log('Haptics not supported on this platform');
+      }
       opacity.value = withTiming(1, { duration: 300 });
       scale.value = withSpring(1, {
         damping: 15,
