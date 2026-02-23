@@ -518,11 +518,7 @@ export default function Index() {
             <View style={styles.shadowCircle} />
           </Animated.View>
           
-          <TouchableOpacity
-            onPress={workoutState.isActive ? undefined : startWorkout}
-            activeOpacity={0.8}
-            disabled={workoutState.isActive}
-          >
+          <GestureDetector gesture={Gesture.Exclusive(logoLongPress, logoTap)}>
             <Animated.View
               style={[
                 styles.logoCircle,
@@ -534,7 +530,7 @@ export default function Index() {
             >
               <Text style={styles.logoText}>B</Text>
             </Animated.View>
-          </TouchableOpacity>
+          </GestureDetector>
         </View>
 
         {/* Instructions */}
