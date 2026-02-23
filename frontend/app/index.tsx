@@ -220,7 +220,11 @@ export default function Index() {
   // Menu handler functions
   const handlePause = () => {
     setIsPaused(!isPaused);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (error) {
+      console.log('Haptics not supported');
+    }
     
     if (!isPaused) {
       setWorkoutState(prev => ({
@@ -237,7 +241,12 @@ export default function Index() {
 
   const handleAdvanceRound = () => {
     if (workoutState.currentRound < 7) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch (error) {
+        console.log('Haptics not supported');
+      }
+      
       const nextRound = workoutState.currentRound + 1;
       
       setWorkoutState(prev => ({
@@ -260,7 +269,11 @@ export default function Index() {
   };
 
   const handleRepeatRound = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (error) {
+      console.log('Haptics not supported');
+    }
     
     setWorkoutState(prev => ({
       ...prev,
