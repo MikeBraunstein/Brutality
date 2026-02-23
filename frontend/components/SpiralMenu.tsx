@@ -342,24 +342,5 @@ const SpiralMenu: React.FC<SpiralMenuProps> = ({ isVisible, onClose, items }) =>
   );
 };
 
-// Generate SVG path for spiral trail
-const generateSpiralPath = () => {
-  const points: string[] = [];
-  const steps = 100;
-  
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const position = calculateSpiralPosition(t);
-    
-    if (i === 0) {
-      points.push(`M ${position.x} ${position.y}`);
-    } else {
-      points.push(`L ${position.x} ${position.y}`);
-    }
-  }
-  
-  return points.join(' ');
-};
-
 export default SpiralMenu;
 export type { SpiralMenuItem };
