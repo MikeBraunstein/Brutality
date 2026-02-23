@@ -177,8 +177,90 @@ export default function Index() {
       if (moveTimer.current) {
         clearTimeout(moveTimer.current);
       }
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+      }
     };
   }, []);
+
+  // Logo gesture handlers
+  const logoLongPress = Gesture.LongPress()
+    .minDuration(1000) // 1 second minimum
+    .onStart(() => {
+      console.log('Long press started');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      
+      // Enhanced animation for long press
+      Animated.parallel([
+        Animated.timing(logoScale, {
+          toValue: 1.3,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoGlow, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(shadowOpacity, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    })
+    .onEnd(() => {
+      console.log('Long press completed - showing spiral menu');
+      setShowSpiralMenu(true);
+      
+      // Reset logo animation
+      Animated.parallel([
+        Animated.timing(logoScale, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoGlow, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(shadowOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    })
+    .onFinalize(() => {
+      // Reset animations if gesture was cancelled
+      Animated.parallel([
+        Animated.timing(logoScale, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoGlow, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(shadowOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+
+  const logoTap = Gesture.Tap()
+    .maxDuration(1000) // Don't trigger if it's actually a long press
+    .onEnd(() => {
+      if (!workoutState.isActive && !showSpiralMenu) {
+        console.log('Quick tap - starting workout');
+        startWorkout();
+      }
+    });
 
   const animateLogo = () => {
     // Scale animation
