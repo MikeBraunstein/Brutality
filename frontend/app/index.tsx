@@ -46,8 +46,8 @@ export default function Index() {
   const shadowOpacity = useRef(new Animated.Value(0)).current;
 
   // Timer refs
-  const workoutTimer = useRef<NodeJS.Timeout | null>(null);
-  const moveTimer = useRef<NodeJS.Timeout | null>(null);
+  const workoutTimer = useRef<any>(null);
+  const moveTimer = useRef<any>(null);
 
   // Move definitions
   const moves = {
