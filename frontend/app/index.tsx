@@ -65,7 +65,7 @@ export default function Index() {
 
   // Timer effect
   useEffect(() => {
-    if (workoutState.isActive && workoutState.timeRemaining > 0) {
+    if (workoutState.isActive && workoutState.timeRemaining > 0 && !isPaused) {
       workoutTimer.current = setTimeout(() => {
         setWorkoutState(prev => ({
           ...prev,
@@ -82,7 +82,7 @@ export default function Index() {
         clearTimeout(workoutTimer.current);
       }
     };
-  }, [workoutState.isActive, workoutState.timeRemaining]);
+  }, [workoutState.isActive, workoutState.timeRemaining, isPaused]);
 
   // Cleanup on unmount
   useEffect(() => {
