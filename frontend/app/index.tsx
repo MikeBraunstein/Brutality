@@ -453,6 +453,9 @@ export default function Index() {
             <Text style={styles.instructionsSubtext}>
               7 rounds • 5 minutes each • 3 minute breaks
             </Text>
+            <Text style={styles.instructionsSubtext}>
+              Hold logo for menu options
+            </Text>
           </View>
         )}
 
