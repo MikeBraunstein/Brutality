@@ -216,20 +216,35 @@ const SpiralMenu: React.FC<SpiralMenuProps> = ({ isVisible, onClose, items }) =>
             containerAnimatedStyle,
           ]}
         >
-          {/* Spiral Trail Effect */}
-          <Svg
-            width={screenWidth}
-            height={screenHeight}
-            style={{ position: 'absolute', top: 0, left: 0 }}
-          >
-            <Path
-              d={generateSpiralPath()}
-              stroke="rgba(255, 107, 53, 0.3)"
-              strokeWidth="2"
-              fill="none"
-              strokeDasharray="5,10"
-            />
-          </Svg>
+          {/* Spiral Trail Effect - Simple animated circles */}
+          <View style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            pointerEvents: 'none',
+          }}>
+            {[...Array(20)].map((_, i) => {
+              const t = i / 19;
+              const position = calculateSpiralPosition(t);
+              return (
+                <Animated.View
+                  key={i}
+                  style={{
+                    position: 'absolute',
+                    left: position.x - 2,
+                    top: position.y - 2,
+                    width: 4,
+                    height: 4,
+                    borderRadius: 2,
+                    backgroundColor: 'rgba(255, 107, 53, 0.3)',
+                    opacity: opacity.value * 0.5,
+                  }}
+                />
+              );
+            })}
+          </View>
 
           {/* Menu Items */}
           {activeItems.map((item, index) => (
