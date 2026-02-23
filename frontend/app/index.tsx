@@ -209,10 +209,86 @@ export default function Index() {
         currentMove: 'Workout Complete! Great job!'
       }));
       
+      setIsPaused(false);
       Alert.alert('Congratulations!', 'You have completed the Brutality workout!');
     } catch (error) {
       console.error('Error completing workout:', error);
     }
+  };
+
+  // Menu handler functions
+  const handlePause = () => {
+    setIsPaused(!isPaused);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    if (!isPaused) {
+      setWorkoutState(prev => ({
+        ...prev,
+        currentMove: 'Workout Paused'
+      }));
+    } else {
+      // Resume workout
+      setTimeout(() => {
+        callNextMove();
+      }, 1000);
+    }
+  };
+
+  const handleAdvanceRound = () => {
+    if (workoutState.currentRound < 7) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const nextRound = workoutState.currentRound + 1;
+      
+      setWorkoutState(prev => ({
+        ...prev,
+        currentRound: nextRound,
+        timeRemaining: 300,
+        isBreak: false,
+        complexityScore: 0.0,
+        intensityScore: Math.min(1.0, prev.intensityScore + 0.1),
+        currentMove: `Starting Round ${nextRound}...`
+      }));
+      
+      setIsPaused(false);
+      setTimeout(() => {
+        startRound(nextRound);
+      }, 2000);
+    } else {
+      Alert.alert('Final Round', 'You are already on the final round!');
+    }
+  };
+
+  const handleRepeatRound = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    
+    setWorkoutState(prev => ({
+      ...prev,
+      timeRemaining: 300,
+      isBreak: false,
+      complexityScore: 0.0,
+      currentMove: `Repeating Round ${prev.currentRound}...`
+    }));
+    
+    setIsPaused(false);
+    setTimeout(() => {
+      startRound(workoutState.currentRound);
+    }, 2000);
+  };
+
+  const handleSpotifyConnect = () => {
+    Alert.alert(
+      'Spotify Integration',
+      'Spotify integration coming soon! Connect your account to stream workout music.',
+      [{ text: 'OK' }]
+    );
+  };
+
+  const handleSettings = () => {
+    Alert.alert(
+      'Settings',
+      'Settings menu coming soon!\n\n• Workout preferences\n• Audio settings\n• Profile customization',
+      [{ text: 'OK' }]
+    );
   };
 
   const playWelcomeMessage = async () => {
