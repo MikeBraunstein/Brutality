@@ -646,7 +646,11 @@ const styles = StyleSheet.create({
     .minDuration(1000) // 1 second hold
     .onStart(() => {
       console.log('Long press started - showing menu');
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      } catch (error) {
+        console.log('Haptics not supported');
+      }
       
       // Enhanced animation during hold
       Animated.parallel([
