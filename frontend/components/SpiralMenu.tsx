@@ -7,11 +7,9 @@ import Animated, {
   withTiming,
   runOnJS,
   interpolate,
-  useDerivedValue,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
-import Svg, { Path } from 'react-native-svg';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const centerX = screenWidth / 2;
