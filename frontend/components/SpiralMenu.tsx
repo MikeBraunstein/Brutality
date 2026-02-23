@@ -62,7 +62,7 @@ const SpiralMenu: React.FC<SpiralMenuProps> = ({ isVisible, onClose, items }) =>
   const itemPositions = useSharedValue<number[]>(items.map((_, i) => i / items.length));
   
   const [activeItems, setActiveItems] = useState<SpiralMenuItem[]>([]);
-  const animationFrame = useRef<number>();
+  const animationFrame = useRef<any>();
 
   // Initialize items when menu becomes visible
   useEffect(() => {
