@@ -42,6 +42,10 @@ export default function Index() {
     sessionId: null
   });
 
+  // Hold Menu State
+  const [showHoldMenu, setShowHoldMenu] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+
   // Animation values
   const logoScale = useRef(new Animated.Value(1)).current;
   const logoGlow = useRef(new Animated.Value(0)).current;
