@@ -573,6 +573,13 @@ export default function Index() {
           </View>
         )}
       </View>
+
+      {/* Spiral Menu */}
+      <SpiralMenu
+        isVisible={showSpiralMenu}
+        onClose={() => setShowSpiralMenu(false)}
+        items={spiralMenuItems}
+      />
     </SafeAreaView>
   );
 }
