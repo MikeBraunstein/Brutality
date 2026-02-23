@@ -614,3 +614,82 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 });
+
+  // Logo gesture handlers
+  const logoLongPress = Gesture.LongPress()
+    .minDuration(1000) // 1 second hold
+    .onStart(() => {
+      console.log('Long press started - showing menu');
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      
+      // Enhanced animation during hold
+      Animated.parallel([
+        Animated.timing(logoScale, {
+          toValue: 1.2,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoGlow, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(shadowOpacity, {
+          toValue: 0.8,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    })
+    .onEnd(() => {
+      console.log('Long press completed - showing hold menu');
+      setShowHoldMenu(true);
+      
+      // Reset animations
+      Animated.parallel([
+        Animated.timing(logoScale, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoGlow, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(shadowOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    })
+    .onFinalize(() => {
+      // Reset if cancelled
+      Animated.parallel([
+        Animated.timing(logoScale, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoGlow, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(shadowOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    });
+
+  const logoTap = Gesture.Tap()
+    .maxDuration(999) // Don't trigger if it becomes a long press
+    .onEnd(() => {
+      if (!workoutState.isActive && !showHoldMenu) {
+        console.log('Quick tap - starting workout');
+        startWorkout();
+      }
+    });
