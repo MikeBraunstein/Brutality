@@ -3,16 +3,14 @@ import {
   View, 
   Text, 
   StyleSheet, 
+  TouchableOpacity,
   Animated, 
   Dimensions,
   StatusBar,
   Alert 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import * as Haptics from 'expo-haptics';
 import { BrutalityAPI } from '../services/api';
-import SpiralMenu, { SpiralMenuItem } from '../components/SpiralMenu';
 
 const { width, height } = Dimensions.get('window');
 
