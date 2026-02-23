@@ -6,7 +6,8 @@ import {
   Animated, 
   Dimensions,
   StatusBar,
-  Alert 
+  Alert,
+  TouchableOpacity 
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
