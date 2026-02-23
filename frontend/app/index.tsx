@@ -487,6 +487,19 @@ export default function Index() {
           </View>
         )}
       </View>
+
+      {/* Hold Menu */}
+      <HoldMenu
+        isVisible={showHoldMenu}
+        onClose={() => setShowHoldMenu(false)}
+        isWorkoutActive={workoutState.isActive}
+        currentRound={workoutState.currentRound}
+        onPause={handlePause}
+        onAdvanceRound={handleAdvanceRound}
+        onRepeatRound={handleRepeatRound}
+        onSpotifyConnect={handleSpotifyConnect}
+        onSettings={handleSettings}
+      />
     </SafeAreaView>
   );
 }
