@@ -42,6 +42,9 @@ export default function Index() {
     sessionId: null
   });
 
+  // Spiral Menu State
+  const [showSpiralMenu, setShowSpiralMenu] = useState(false);
+
   // Animation values
   const logoScale = useRef(new Animated.Value(1)).current;
   const logoGlow = useRef(new Animated.Value(0)).current;
@@ -50,6 +53,7 @@ export default function Index() {
   // Timer refs
   const workoutTimer = useRef<NodeJS.Timeout | null>(null);
   const moveTimer = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Move definitions
   const moves = {
@@ -58,6 +62,90 @@ export default function Index() {
     3: 'Left hook',
     4: 'Right uppercut'
   };
+
+  // Spiral Menu Items
+  const spiralMenuItems: SpiralMenuItem[] = [
+    {
+      id: 'settings',
+      title: 'Settings',
+      icon: '⚙️',
+      color: '#4A90E2',
+      action: () => {
+        Alert.alert('Settings', 'Settings menu coming soon!');
+        setShowSpiralMenu(false);
+      }
+    },
+    {
+      id: 'statistics',
+      title: 'Stats',
+      icon: '📊',
+      color: '#7ED321',
+      action: () => {
+        Alert.alert('Statistics', 'Workout statistics coming soon!');
+        setShowSpiralMenu(false);
+      }
+    },
+    {
+      id: 'music',
+      title: 'Music',
+      icon: '🎵',
+      color: '#BD10E0',
+      action: () => {
+        Alert.alert('Music', 'Music selection coming soon!');
+        setShowSpiralMenu(false);
+      }
+    },
+    {
+      id: 'profile',
+      title: 'Profile',
+      icon: '👤',
+      color: '#F5A623',
+      action: () => {
+        Alert.alert('Profile', 'User profile coming soon!');
+        setShowSpiralMenu(false);
+      }
+    },
+    {
+      id: 'history',
+      title: 'History',
+      icon: '📚',
+      color: '#50E3C2',
+      action: () => {
+        Alert.alert('History', 'Workout history coming soon!');
+        setShowSpiralMenu(false);
+      }
+    },
+    {
+      id: 'customize',
+      title: 'Custom',
+      icon: '🎨',
+      color: '#D0021B',
+      action: () => {
+        Alert.alert('Customize', 'Workout customization coming soon!');
+        setShowSpiralMenu(false);
+      }
+    },
+    {
+      id: 'help',
+      title: 'Help',
+      icon: '❓',
+      color: '#9013FE',
+      action: () => {
+        Alert.alert('Help', 'Help & Tutorial coming soon!');
+        setShowSpiralMenu(false);
+      }
+    },
+    {
+      id: 'share',
+      title: 'Share',
+      icon: '🔗',
+      color: '#FF6B35',
+      action: () => {
+        Alert.alert('Share', 'Share your progress coming soon!');
+        setShowSpiralMenu(false);
+      }
+    },
+  ];
 
   // Timer effect
   useEffect(() => {
