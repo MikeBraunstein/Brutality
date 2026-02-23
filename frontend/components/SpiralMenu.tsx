@@ -37,7 +37,6 @@ const MAX_RADIUS = 180; // Maximum distance from center
 const ITEM_SIZE_MIN = 30;
 const ITEM_SIZE_MAX = 70;
 
-// Calculate logarithmic spiral position
 const calculateSpiralPosition = (
   t: number, // parameter from 0 to 1
   rotation: number = 0 // additional rotation in radians
