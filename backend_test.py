@@ -15,6 +15,9 @@ import uuid
 BACKEND_URL = "https://boxing-beats.preview.emergentagent.com/api"
 
 class BrutalityBackendTester:
+    '''
+    Class to simulate the Brutality Workout App and its modules
+    '''
     def __init__(self):
         self.session = requests.Session()
         self.test_results = []
