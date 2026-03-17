@@ -12,7 +12,7 @@ from datetime import datetime
 import uuid
 
 # Get backend URL from frontend .env
-BACKEND_URL = "https://boxing-beats.preview.emergentagent.com/api"
+BACKEND_URL = "https://brutality-rounds.preview.emergentagent.com/api"
 
 class BrutalityBackendTester:
     '''

@@ -1,309 +1,221 @@
-# Brutality Fitness App 🥊
+# Brutality - AI-Powered Boxing Fitness App
 
-A revolutionary cross-platform mobile fitness application featuring an **advanced spiral UI system** and **AI-powered workout coaching**.
-
-## 🌟 **Key Features**
-
-### **Core Workout System:**
-- ✅ **7-round training program** (5 minutes each + 3 minute breaks)
-- ✅ **Dynamic move generation** with complexity/intensity progression
-- ✅ **Real-time timer countdown** with visual feedback
-- ✅ **Combat training moves**: Left/right straights, hooks, uppercuts
-- ✅ **Defense positions**: Krav Maga plank stances
-- ✅ **Progress tracking** with visual indicators
-
-### **🌀 Revolutionary Spiral UI Menu:**
-- ✅ **Long press (1+ second)** on logo to activate
-- ✅ **Logarithmic spiral mathematics** for smooth item movement
-- ✅ **Rotation gesture control**: Clockwise ↻ (outward) / Counter-clockwise ↺ (inward)
-- ✅ **60fps animations** using React Native Reanimated v3
-- ✅ **Haptic feedback** for enhanced user experience
-- ✅ **Dynamic size/opacity scaling** as items move along spiral
-- ✅ **8 interactive menu options**: Settings, Stats, Music, Profile, History, Custom, Help, Share
-
-### **Technical Excellence:**
-- ✅ **Cross-platform compatibility** (iOS + Android)
-- ✅ **Professional TypeScript architecture**
-- ✅ **Modern React Native with Expo**
-- ✅ **FastAPI backend** with MongoDB
-- ✅ **Advanced gesture recognition**
-- ✅ **Hardware-accelerated animations**
+A cross-platform (Android/iOS/Web) boxing fitness application with AI-guided workout sessions, text-to-speech instructor callouts, and an immersive dark UI.
 
 ---
 
-## 🚀 **Quick Start Installation**
+## Architecture
 
-### **Prerequisites:**
-- [Node.js 18+](https://nodejs.org/) with yarn package manager
-- [Python 3.11+](https://python.org/) for backend
-- [MongoDB](https://mongodb.com/) (local or cloud)
-- Mobile device with [Expo Go](https://expo.dev/go) app
-
-### **1. Clone & Install:**
-```bash
-# Install frontend dependencies
-cd frontend
-yarn install
-
-# Install backend dependencies  
-cd ../backend
-pip install -r requirements.txt
+```
+brutality/
+├── backend/            # Python FastAPI server
+│   ├── server.py       # API endpoints & workout engine
+│   ├── requirements.txt
+│   └── .env            # Backend environment variables
+├── frontend/           # React Native / Expo app
+│   ├── app/
+│   │   ├── _layout.tsx # Root layout (Gesture + SafeArea providers)
+│   │   └── index.tsx   # Main workout screen
+│   ├── components/
+│   │   └── HoldMenu.tsx # Long-press radial menu
+│   ├── services/
+│   │   └── api.ts      # API client with browser TTS fallback
+│   └── package.json
+└── README.md
 ```
 
-### **2. Environment Setup:**
-```bash
-# Frontend (.env file already configured)
-EXPO_PUBLIC_BACKEND_URL=https://your-domain.com
+## Prerequisites
 
-# Backend (.env file already configured) 
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=brutality_fitness
-```
+| Tool       | Version  | Install                                      |
+|------------|----------|----------------------------------------------|
+| Node.js    | >= 18    | https://nodejs.org                           |
+| Yarn       | >= 1.22  | `npm install -g yarn`                        |
+| Python     | >= 3.11  | https://python.org                           |
+| MongoDB    | >= 6.0   | https://www.mongodb.com/docs/manual/installation/ |
+| Expo CLI   | latest   | `npm install -g expo-cli` (optional, Expo is in `node_modules`) |
 
-### **3. Start Services:**
+---
+
+## Quick Start
+
+### 1. Clone & install dependencies
+
 ```bash
-# Terminal 1: Start Backend API
+git clone <repo-url> brutality && cd brutality
+
+# Backend
 cd backend
-python server.py
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 
-# Terminal 2: Start Frontend
-cd frontend  
-yarn start
+# Frontend
+cd ../frontend
+yarn install
 ```
 
-### **4. Mobile Testing:**
-1. **Install Expo Go** on your mobile device
-2. **Scan QR code** displayed in terminal
-3. **Enable haptic feedback** in device settings for full experience
+### 2. Configure environment variables
 
----
-
-## 📱 **User Guide**
-
-### **Getting Started:**
-1. **Quick Tap** the 'B' logo → Start workout immediately
-2. **Long Press (1+ sec)** the 'B' logo → Access spiral menu
-
-### **Spiral Menu Navigation:**
-- **Rotate clockwise** ↻ → Move items outward (towards you)
-- **Rotate counter-clockwise** ↺ → Move items inward (away from you)  
-- **Tap any item** → Select and execute action
-- **Pan away from center** → Close menu
-
-### **Workout Controls:**
-- **Round timer** shows remaining time (format: 4:32)
-- **Complexity bar** shows workout difficulty progression
-- **Intensity bar** shows defense move frequency
-- **Move commands** appear in center during workout
-
----
-
-## 🏗️ **Architecture & Dependencies**
-
-### **Frontend Stack:**
-```json
-{
-  "react-native": "0.79.5",
-  "expo": "^54.0.33", 
-  "react-native-reanimated": "3.17.5",
-  "react-native-gesture-handler": "2.24.0",
-  "expo-haptics": "14.1.4",
-  "react-native-svg": "15.15.3",
-  "@shopify/react-native-skia": "2.4.21"
-}
+**Backend** (`backend/.env`):
+```env
+MONGO_URL=mongodb://localhost:27017
+DB_NAME=brutality_db
 ```
 
-### **Backend Stack:**
-```python
-fastapi==0.115.2
-uvicorn==0.32.0  
-motor==3.6.0  # MongoDB async driver
-pydantic==2.9.2
-httpx==0.28.1
+> **Optional – OpenAI TTS**: To enable high-quality AI speech instead of browser
+> speech synthesis, add your OpenAI API key:
+> ```env
+> OPENAI_API_KEY=sk-your-key-here
+> ```
+
+**Frontend** (`frontend/.env`):
+```env
+EXPO_PUBLIC_BACKEND_URL=http://localhost:8001
 ```
 
-### **Key Libraries Explained:**
+### 3. Start MongoDB
 
-#### **🎨 Animation & Graphics:**
-- **react-native-reanimated v3** → 60fps UI thread animations
-- **@shopify/react-native-skia** → GPU-accelerated rendering
-- **react-native-svg** → Vector graphics for spiral trails
-
-#### **👆 Gesture & Interaction:**
-- **react-native-gesture-handler v2** → Advanced multi-touch gestures
-- **expo-haptics** → Native tactile feedback
-- **d3-shape** → Mathematical spiral calculations
-
----
-
-## 🔧 **Development Setup**
-
-### **Project Structure:**
-```
-brutality-fitness/
-├── frontend/                 # React Native Expo app
-│   ├── app/                 # Expo Router file-based routing  
-│   │   └── index.tsx        # Main app with spiral menu
-│   ├── components/          # Reusable components
-│   │   └── SpiralMenu.tsx   # Advanced spiral UI component
-│   └── services/            # API integration
-│       └── api.ts           # Backend communication
-├── backend/                 # FastAPI Python server
-│   └── server.py           # API endpoints & workout logic
-└── docs/                   # Documentation
-    └── SPIRAL_UI_DOCUMENTATION.md
-```
-
-### **Development Commands:**
 ```bash
-# Frontend development
-yarn start          # Start Expo dev server
-yarn android        # Run on Android emulator  
-yarn ios           # Run on iOS simulator
-yarn lint          # Code quality check
+# macOS (Homebrew)
+brew services start mongodb-community
 
-# Backend development  
-python server.py    # Start FastAPI server
-pytest             # Run API tests
+# Linux (systemd)
+sudo systemctl start mongod
+
+# Docker
+docker run -d -p 27017:27017 --name brutality-mongo mongo:7
 ```
 
-### **Code Quality Standards:**
-- ✅ **TypeScript** for type safety
-- ✅ **ESLint + Prettier** for code formatting
-- ✅ **Component-based architecture**
-- ✅ **Comprehensive error handling**
-- ✅ **Performance optimizations**
+### 4. Run the backend
 
----
-
-## 🧮 **Spiral Mathematics Explained**
-
-### **Logarithmic Spiral Formula:**
-```javascript
-// Core spiral equation: r = a * e^(b*θ)
-const calculateSpiralPosition = (t, rotation = 0) => {
-  const theta = t * SPIRAL_TURNS * 2 * Math.PI + rotation;
-  const r = MIN_RADIUS + (MAX_RADIUS - MIN_RADIUS) * Math.pow(t, 1.5);
-  
-  return {
-    x: centerX + r * Math.cos(theta),  // Cartesian X
-    y: centerY + r * Math.sin(theta),  // Cartesian Y  
-    radius: r,                         // Distance from center
-    angle: theta                       // Rotation angle
-  };
-};
+```bash
+cd backend
+source .venv/bin/activate
+uvicorn server:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-### **Animation Parameters:**
-```javascript
-const SPIRAL_GROWTH_RATE = 0.2;    // Expansion speed
-const SPIRAL_TURNS = 3;             // Complete rotations  
-const MIN_RADIUS = 60;              // Inner boundary
-const MAX_RADIUS = 180;             // Outer boundary
-const ITEM_SIZE_MIN = 30;           // Smallest item size
-const ITEM_SIZE_MAX = 70;           // Largest item size
-```
+The API will be available at **http://localhost:8001/api/**
 
----
+### 5. Run the frontend
 
-## 🎯 **Performance Optimization**
-
-### **60fps Animation Techniques:**
-- **Worklet functions** run on UI thread
-- **GPU-accelerated** gesture processing  
-- **Optimized re-renders** with shared values
-- **Memory cleanup** on component unmount
-- **Debounced haptic feedback** prevents performance issues
-
-### **Mobile-Specific Optimizations:**
-- **Hardware acceleration** enabled for all animations
-- **Touch target sizes** meet accessibility standards (44px+)  
-- **Battery optimization** with efficient gesture handling
-- **Cross-platform compatibility** maintained
-
----
-
-## 🚨 **Troubleshooting**
-
-### **Common Issues:**
-
-#### **Metro bundler not starting:**
 ```bash
 cd frontend
-yarn cache clean
-yarn install  
-yarn start --clear
+
+# Web
+yarn expo start --web
+
+# iOS Simulator
+yarn expo start --ios
+
+# Android Emulator
+yarn expo start --android
+
+# Physical device (scan QR code)
+yarn expo start
 ```
 
-#### **Gesture not working:**
-- Ensure device supports multi-touch gestures
-- Check haptic feedback is enabled in device settings
-- Verify react-native-gesture-handler is properly linked
+---
 
-#### **Animations choppy:**
-- Close other apps to free up memory
-- Ensure device supports hardware acceleration
-- Check if running in development vs production mode
+## API Endpoints
 
-#### **Backend API errors:**
-- Verify MongoDB connection string
-- Check FastAPI server is running on port 8001  
-- Ensure CORS is properly configured
+| Method | Endpoint                     | Description                       |
+|--------|------------------------------|-----------------------------------|
+| GET    | `/api/`                      | Health check                      |
+| POST   | `/api/workout/start`         | Start a new workout session       |
+| GET    | `/api/workout/{session_id}`  | Get workout session details       |
+| POST   | `/api/workout/{session_id}/complete` | Complete a workout session |
+| POST   | `/api/workout/move-command`  | Generate a punch/defense command  |
+| POST   | `/api/tts/generate`          | Generate text-to-speech audio     |
+| POST   | `/api/audio/upload`          | Upload background music track     |
+| GET    | `/api/audio/tracks`          | List available audio tracks       |
+
+### Example: Start a workout
+
+```bash
+curl -X POST http://localhost:8001/api/workout/start \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "player_1"}'
+```
+
+### Example: Generate a move command
+
+```bash
+curl -X POST "http://localhost:8001/api/workout/move-command?complexity=0.5&intensity=0.7&round_number=3"
+```
 
 ---
 
-## 📈 **Future Enhancements**
+## Workout Structure
 
-### **Planned Features:**
-- 🎵 **Spotify integration** for dynamic workout music
-- 🗣️ **OpenAI TTS** for AI instructor voice (needs API key)
-- 📊 **Advanced analytics** with workout history charts
-- 👥 **Social features** for sharing progress
-- 🎮 **Gamification** with achievements and leaderboards  
-- 📱 **Apple Watch** integration for heart rate monitoring
-
-### **Technical Roadmap:**
-- **React Native 0.75+** upgrade for latest performance
-- **Expo SDK 55+** for newest platform features
-- **WebGL integration** for 3D spiral effects
-- **Machine learning** move recognition via camera
-- **Cloud sync** for cross-device workout data
+- **7 rounds**, 5 minutes each
+- **3-minute rest** between rounds
+- **ComplexityScore** (0.0–1.0): Governs combo difficulty — starts with single-number calls, progresses to broken combos
+- **IntensityScore** (0.0–1.0): Governs frequency of "Defense" (plank) commands
+- Punch callouts: `1` = Left straight, `2` = Right straight, `3` = Left hook, `4` = Right uppercut
 
 ---
 
-## 📄 **License & Credits**
+## Features
 
-### **Open Source Libraries:**
-- React Native & Expo ecosystem
-- Shopify React Native Skia graphics engine
-- D3.js mathematical utilities  
-- FastAPI Python web framework
+### Implemented
+- Black UI with metallic "B" logo and molten-orange tap animation
+- Full workout timer (round progression, break detection)
+- AI-generated move commands with complexity/intensity scaling
+- **Hold Menu**: Long-press the logo (1 sec) to access:
+  - Settings
+  - Spotify connection (placeholder)
+  - Pause/Resume workout
+  - Advance to next round
+  - Repeat current round
+- **TTS Instructor**: Uses OpenAI TTS when an API key is provided, otherwise falls back to the browser's built-in Web Speech API
+- Haptic feedback on supported devices
 
-### **Design Inspiration:**  
-- **Spiral staircase** visual metaphor
-- **Logarithmic growth** patterns in nature
-- **Mobile-first** gesture interactions
-- **Haptic feedback** best practices
-
----
-
-## 🤝 **Contributing**
-
-Contributions welcome! Please read our contributing guidelines and submit pull requests for any improvements.
-
-### **Development Guidelines:**
-1. **Follow TypeScript** strict mode
-2. **Test on multiple devices** before submitting
-3. **Document new features** with examples
-4. **Optimize for performance** on mid-range devices
-5. **Maintain cross-platform** compatibility
+### Planned
+- Spiral logarithmic menu animation
+- Spotify integration for background techno-house music
+- User authentication & workout history
+- Push notification reminders
 
 ---
 
-## 💪 **Ready to Train?**
+## Building for Production
 
-Experience the future of fitness apps with **Brutality's revolutionary spiral UI**. The combination of **advanced mathematics**, **cutting-edge animations**, and **intuitive gestures** creates a truly unique mobile experience.
+### Static Web Build
 
-**Tap to start. Hold to explore. Rotate to control.** 🌀
+```bash
+cd frontend
+yarn expo export --platform web
+# Output → frontend/dist/
+# Serve with any static file server (nginx, serve, etc.)
+npx serve dist
+```
 
-*The spiral awaits...* ✨
+### Native Builds (EAS)
+
+```bash
+# Install EAS CLI
+npm install -g eas-cli
+
+# Build for iOS
+eas build --platform ios
+
+# Build for Android
+eas build --platform android
+```
+
+---
+
+## Troubleshooting
+
+| Issue | Fix |
+|-------|-----|
+| `Cannot find module 'react-native-worklets/plugin'` | Run `yarn add react-native-worklets@0.5.1` |
+| Metro bundler shows blank page | Clear cache: `yarn expo start --clear` |
+| Backend won't start (KeyError: 'DB_NAME') | Ensure `backend/.env` has `DB_NAME=brutality_db` on its own line |
+| Haptics crash on web | Already handled — haptic calls are wrapped with platform checks |
+| TTS returns empty audio | Add `OPENAI_API_KEY` to `backend/.env`, or the app uses browser speech synthesis as fallback |
+
+---
+
+## License
+
+MIT

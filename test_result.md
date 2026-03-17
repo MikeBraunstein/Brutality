@@ -185,3 +185,5 @@ test_plan:
 agent_communication:
     - agent: "testing"
       message: "Backend testing completed. 9/11 tests passed. Core workout functionality (sessions, move commands, audio tracks) working perfectly. Only TTS failing due to invalid OpenAI API key. MongoDB integration confirmed working. All endpoints return proper HTTP status codes and response models match expected schemas."
+    - agent: "testing"
+      message: "Comprehensive re-testing completed. Confirmed 9/11 tests passing. TTS functionality requires OPENAI_API_KEY but only EMERGENT_LLM_KEY is configured. Error handling issue: GET /api/workout/nonexistent-id returns 500 instead of 404 (minor). All core fitness functionality working perfectly including workout sessions, move command generation, and audio track management."

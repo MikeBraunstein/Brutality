@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  Animated, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
   Dimensions,
-  StatusBar,
   Alert,
-  TouchableOpacity 
+  TouchableOpacity,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { BrutalityAPI } from '../services/api';
@@ -29,21 +28,25 @@ interface WorkoutState {
   sessionId: string | null;
 }
 
+const triggerHaptic = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Medium) => {
+  if (Platform.OS !== 'web') {
+    try { Haptics.impactAsync(style); } catch (_) {}
+  }
+};
+
 export default function Index() {
-  
   const [workoutState, setWorkoutState] = useState<WorkoutState>({
     isActive: false,
     currentRound: 0,
-    timeRemaining: 300, // 5 minutes
+    timeRemaining: 300,
     isBreak: false,
     complexityScore: 0.0,
     intensityScore: 0.0,
     currentMove: '',
     moveTimeRemaining: 0,
-    sessionId: null
+    sessionId: null,
   });
 
-  // Hold Menu State
   const [showHoldMenu, setShowHoldMenu] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -57,11 +60,11 @@ export default function Index() {
   const moveTimer = useRef<any>(null);
 
   // Move definitions
-  const moves = {
+  const moves: Record<number, string> = {
     1: 'Left straight punch',
-    2: 'Right straight punch', 
+    2: 'Right straight punch',
     3: 'Left hook',
-    4: 'Right uppercut'
+    4: 'Right uppercut',
   };
 
   // Timer effect
@@ -70,88 +73,49 @@ export default function Index() {
       workoutTimer.current = setTimeout(() => {
         setWorkoutState(prev => ({
           ...prev,
-          timeRemaining: prev.timeRemaining - 1
+          timeRemaining: prev.timeRemaining - 1,
         }));
       }, 1000);
     } else if (workoutState.isActive && workoutState.timeRemaining === 0) {
-      // Round finished, start break or next round
       handleRoundComplete();
     }
-
     return () => {
-      if (workoutTimer.current) {
-        clearTimeout(workoutTimer.current);
-      }
+      if (workoutTimer.current) clearTimeout(workoutTimer.current);
     };
   }, [workoutState.isActive, workoutState.timeRemaining, isPaused]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (workoutTimer.current) {
-        clearTimeout(workoutTimer.current);
-      }
-      if (moveTimer.current) {
-        clearTimeout(moveTimer.current);
-      }
+      if (workoutTimer.current) clearTimeout(workoutTimer.current);
+      if (moveTimer.current) clearTimeout(moveTimer.current);
     };
   }, []);
 
   const animateLogo = () => {
-    // Scale animation
     Animated.sequence([
-      Animated.timing(logoScale, {
-        toValue: 1.2,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(logoScale, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
+      Animated.timing(logoScale, { toValue: 1.2, duration: 200, useNativeDriver: true }),
+      Animated.timing(logoScale, { toValue: 1, duration: 200, useNativeDriver: true }),
     ]).start();
 
-    // Glow animation
     Animated.sequence([
-      Animated.timing(logoGlow, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: false,
-      }),
-      Animated.timing(logoGlow, {
-        toValue: 0,
-        duration: 700,
-        useNativeDriver: false,
-      }),
+      Animated.timing(logoGlow, { toValue: 1, duration: 300, useNativeDriver: false }),
+      Animated.timing(logoGlow, { toValue: 0, duration: 700, useNativeDriver: false }),
     ]).start();
 
-    // Shadow animation
     Animated.sequence([
-      Animated.timing(shadowOpacity, {
-        toValue: 0.8,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(shadowOpacity, {
-        toValue: 0,
-        duration: 700,
-        useNativeDriver: true,
-      }),
+      Animated.timing(shadowOpacity, { toValue: 0.8, duration: 300, useNativeDriver: true }),
+      Animated.timing(shadowOpacity, { toValue: 0, duration: 700, useNativeDriver: true }),
     ]).start();
   };
 
   const startWorkout = async () => {
     try {
       console.log('Starting workout...');
-
-      // Start workout session with backend
       const session = await BrutalityAPI.startWorkoutSession('user_1');
       console.log('Workout session started:', session.id);
 
       animateLogo();
-      
-      // Start workout
+
       setWorkoutState(prev => ({
         ...prev,
         isActive: true,
@@ -159,96 +123,32 @@ export default function Index() {
         timeRemaining: 300,
         complexityScore: 0.0,
         intensityScore: 0.1,
-        sessionId: session.id
+        sessionId: session.id,
       }));
 
-      // Play welcome message and start workout
       await playWelcomeMessage();
-      
     } catch (error) {
       console.error('Error starting workout:', error);
-      Alert.alert('Error', 'Failed to start workout. Please try again.');
+      // Fallback: start workout locally without backend
+      animateLogo();
+      setWorkoutState(prev => ({
+        ...prev,
+        isActive: true,
+        currentRound: 1,
+        timeRemaining: 300,
+        complexityScore: 0.0,
+        intensityScore: 0.1,
+        sessionId: 'local-session',
+      }));
+      setTimeout(() => startRound(1), 2000);
     }
   };
 
   const handleRoundComplete = () => {
     if (workoutState.currentRound >= 7) {
-      // Workout complete
       completeWorkout();
     } else if (workoutState.isBreak) {
-      // Break finished, start next round
       const nextRound = workoutState.currentRound + 1;
-      setWorkoutState(prev => ({
-        ...prev,
-        currentRound: nextRound,
-        timeRemaining: 300, // 5 minutes
-        isBreak: false,
-        complexityScore: 0.0,
-        intensityScore: Math.min(1.0, prev.intensityScore + 0.1)
-      }));
-      startRound(nextRound);
-    } else {
-      // Round finished, start break
-      setWorkoutState(prev => ({
-        ...prev,
-        timeRemaining: 180, // 3 minutes break
-        isBreak: true,
-        currentMove: 'Break time! Rest and hydrate.'
-      }));
-    }
-  };
-
-  const completeWorkout = async () => {
-    try {
-      if (workoutState.sessionId) {
-        await BrutalityAPI.completeWorkoutSession(workoutState.sessionId);
-      }
-      
-      setWorkoutState(prev => ({
-        ...prev,
-        isActive: false,
-        currentMove: 'Workout Complete! Great job!'
-      }));
-      
-      setIsPaused(false);
-      Alert.alert('Congratulations!', 'You have completed the Brutality workout!');
-    } catch (error) {
-      console.error('Error completing workout:', error);
-    }
-  };
-
-  // Menu handler functions
-  const handlePause = () => {
-    setIsPaused(!isPaused);
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    } catch (error) {
-      console.log('Haptics not supported');
-    }
-    
-    if (!isPaused) {
-      setWorkoutState(prev => ({
-        ...prev,
-        currentMove: 'Workout Paused'
-      }));
-    } else {
-      // Resume workout
-      setTimeout(() => {
-        callNextMove();
-      }, 1000);
-    }
-  };
-
-  const handleAdvanceRound = () => {
-    if (workoutState.currentRound < 7) {
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      } catch (error) {
-        console.log('Haptics not supported');
-      }
-      
-      const nextRound = workoutState.currentRound + 1;
-      
       setWorkoutState(prev => ({
         ...prev,
         currentRound: nextRound,
@@ -256,37 +156,77 @@ export default function Index() {
         isBreak: false,
         complexityScore: 0.0,
         intensityScore: Math.min(1.0, prev.intensityScore + 0.1),
-        currentMove: `Starting Round ${nextRound}...`
       }));
-      
+      startRound(nextRound);
+    } else {
+      setWorkoutState(prev => ({
+        ...prev,
+        timeRemaining: 180,
+        isBreak: true,
+        currentMove: 'Break time! Rest and hydrate.',
+      }));
+    }
+  };
+
+  const completeWorkout = async () => {
+    try {
+      if (workoutState.sessionId && workoutState.sessionId !== 'local-session') {
+        await BrutalityAPI.completeWorkoutSession(workoutState.sessionId);
+      }
+      setWorkoutState(prev => ({
+        ...prev,
+        isActive: false,
+        currentMove: 'Workout Complete! Great job!',
+      }));
       setIsPaused(false);
-      setTimeout(() => {
-        startRound(nextRound);
-      }, 2000);
+      Alert.alert('Congratulations!', 'You have completed the Brutality workout!');
+    } catch (error) {
+      console.error('Error completing workout:', error);
+    }
+  };
+
+  // Menu handlers
+  const handlePause = () => {
+    setIsPaused(p => !p);
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    if (!isPaused) {
+      setWorkoutState(prev => ({ ...prev, currentMove: 'Workout Paused' }));
+    } else {
+      setTimeout(() => callNextMove(), 1000);
+    }
+  };
+
+  const handleAdvanceRound = () => {
+    if (workoutState.currentRound < 7) {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+      const nextRound = workoutState.currentRound + 1;
+      setWorkoutState(prev => ({
+        ...prev,
+        currentRound: nextRound,
+        timeRemaining: 300,
+        isBreak: false,
+        complexityScore: 0.0,
+        intensityScore: Math.min(1.0, prev.intensityScore + 0.1),
+        currentMove: `Starting Round ${nextRound}...`,
+      }));
+      setIsPaused(false);
+      setTimeout(() => startRound(nextRound), 2000);
     } else {
       Alert.alert('Final Round', 'You are already on the final round!');
     }
   };
 
   const handleRepeatRound = () => {
-    try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (error) {
-      console.log('Haptics not supported');
-    }
-    
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
     setWorkoutState(prev => ({
       ...prev,
       timeRemaining: 300,
       isBreak: false,
       complexityScore: 0.0,
-      currentMove: `Repeating Round ${prev.currentRound}...`
+      currentMove: `Repeating Round ${prev.currentRound}...`,
     }));
-    
     setIsPaused(false);
-    setTimeout(() => {
-      startRound(workoutState.currentRound);
-    }, 2000);
+    setTimeout(() => startRound(workoutState.currentRound), 2000);
   };
 
   const handleSpotifyConnect = () => {
@@ -307,30 +247,17 @@ export default function Index() {
 
   const playWelcomeMessage = async () => {
     try {
-      const welcomeText = "Welcome to Brutality, an exercise routine not for the faint of heart.";
+      const welcomeText = 'Welcome to Brutality, an exercise routine not for the faint of heart.';
       console.log('Playing welcome message:', welcomeText);
-      
-      // Generate TTS for welcome message
+
       try {
-        const ttsResponse = await BrutalityAPI.generateTTS({
-          text: welcomeText,
-          voice: 'onyx', // Deep male voice
-          speed: 1.0
-        });
+        await BrutalityAPI.generateTTS({ text: welcomeText, voice: 'onyx', speed: 1.0 });
         console.log('TTS generated successfully');
-        // TODO: Play the audio from ttsResponse.audio_base64
       } catch (error) {
         console.error('TTS generation failed:', error);
       }
-      
-      // Start background music (placeholder)
-      console.log('Starting techno house background music');
-      
-      // Start first round after welcome
-      setTimeout(() => {
-        startRound(1);
-      }, 4000);
-      
+
+      setTimeout(() => startRound(1), 4000);
     } catch (error) {
       console.error('Error playing welcome message:', error);
     }
@@ -338,20 +265,13 @@ export default function Index() {
 
   const startRound = (roundNumber: number) => {
     console.log(`Starting round ${roundNumber}`);
-    
-    // Start calling moves immediately
-    setTimeout(() => {
-      callNextMove();
-    }, 2000);
+    setTimeout(() => callNextMove(), 2000);
   };
 
   const callNextMove = async () => {
-    if (!workoutState.isActive || workoutState.isBreak) {
-      return;
-    }
+    if (!workoutState.isActive || workoutState.isBreak) return;
 
     try {
-      // Generate move command from backend
       const moveCommand = await BrutalityAPI.generateMoveCommand(
         workoutState.complexityScore,
         workoutState.intensityScore,
@@ -359,72 +279,99 @@ export default function Index() {
       );
 
       console.log(`Instructor calls: ${moveCommand.command}`);
-      
-      // Generate TTS for the move command
+
       try {
-        const ttsResponse = await BrutalityAPI.generateTTS({
-          text: moveCommand.command,
-          voice: 'onyx',
-          speed: 1.2 // Slightly faster for commands
-        });
-        // TODO: Play the audio from ttsResponse.audio_base64
+        await BrutalityAPI.generateTTS({ text: moveCommand.command, voice: 'onyx', speed: 1.2 });
       } catch (error) {
         console.error('Move TTS generation failed:', error);
       }
-      
+
       setWorkoutState(prev => ({
         ...prev,
         currentMove: moveCommand.command,
-        moveTimeRemaining: moveCommand.duration_ms
+        moveTimeRemaining: moveCommand.duration_ms,
       }));
 
-      // Increase complexity gradually during round (every 30 seconds)
       if (workoutState.timeRemaining % 30 === 0) {
         setWorkoutState(prev => ({
           ...prev,
-          complexityScore: Math.min(1.0, prev.complexityScore + 0.1)
+          complexityScore: Math.min(1.0, prev.complexityScore + 0.1),
         }));
       }
 
-      // Schedule next move
-      moveTimer.current = setTimeout(() => {
-        callNextMove();
-      }, moveCommand.duration_ms);
-
+      moveTimer.current = setTimeout(() => callNextMove(), moveCommand.duration_ms);
     } catch (error) {
       console.error('Error generating move command:', error);
-      
-      // Fallback to local move generation
-      setTimeout(() => {
-        callNextMove();
-      }, 3000);
+      // Fallback: generate a local move
+      const localMoveNum = Math.floor(Math.random() * 4) + 1;
+      setWorkoutState(prev => ({
+        ...prev,
+        currentMove: `${localMoveNum}`,
+      }));
+      moveTimer.current = setTimeout(() => callNextMove(), 3000);
     }
   };
 
+  // ── Gesture handlers (MUST be inside the component) ──
+  const logoLongPress = Gesture.LongPress()
+    .minDuration(1000)
+    .onStart(() => {
+      triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
+
+      Animated.parallel([
+        Animated.timing(logoScale, { toValue: 1.2, duration: 1000, useNativeDriver: true }),
+        Animated.timing(logoGlow, { toValue: 1, duration: 1000, useNativeDriver: false }),
+        Animated.timing(shadowOpacity, { toValue: 0.8, duration: 1000, useNativeDriver: true }),
+      ]).start();
+    })
+    .onEnd(() => {
+      console.log('Long press completed - showing hold menu');
+      setShowHoldMenu(true);
+
+      Animated.parallel([
+        Animated.timing(logoScale, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(logoGlow, { toValue: 0, duration: 300, useNativeDriver: false }),
+        Animated.timing(shadowOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start();
+    })
+    .onFinalize(() => {
+      Animated.parallel([
+        Animated.timing(logoScale, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(logoGlow, { toValue: 0, duration: 300, useNativeDriver: false }),
+        Animated.timing(shadowOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start();
+    });
+
+  const logoTap = Gesture.Tap()
+    .maxDuration(999)
+    .onEnd(() => {
+      if (!workoutState.isActive && !showHoldMenu) {
+        console.log('Quick tap - starting workout');
+        startWorkout();
+      }
+    });
+
   const logoGlowColor = logoGlow.interpolate({
     inputRange: [0, 1],
-    outputRange: ['#808080', '#FF6B35'] // Gray to orange
+    outputRange: ['#808080', '#FF6B35'],
   });
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
-      
+    <View style={styles.container}>
       <View style={styles.content}>
         {/* Workout Status */}
         {workoutState.isActive && (
-          <View style={styles.statusContainer}>
+          <View style={styles.statusContainer} data-testid="workout-status">
             <Text style={styles.statusText}>
               Round {workoutState.currentRound}/7
             </Text>
             <Text style={styles.timerText}>
-              {Math.floor(workoutState.timeRemaining / 60)}:{(workoutState.timeRemaining % 60).toString().padStart(2, '0')}
+              {Math.floor(workoutState.timeRemaining / 60)}:
+              {(workoutState.timeRemaining % 60).toString().padStart(2, '0')}
             </Text>
-            {workoutState.currentMove && (
-              <Text style={styles.moveText}>
-                {workoutState.currentMove}
-              </Text>
-            )}
+            {workoutState.currentMove ? (
+              <Text style={styles.moveText}>{workoutState.currentMove}</Text>
+            ) : null}
           </View>
         )}
 
@@ -433,23 +380,18 @@ export default function Index() {
           <Animated.View
             style={[
               styles.shadowContainer,
-              {
-                opacity: shadowOpacity,
-                transform: [{ scale: logoScale }],
-              },
+              { opacity: shadowOpacity, transform: [{ scale: logoScale }] },
             ]}
           >
             <View style={styles.shadowCircle} />
           </Animated.View>
-          
+
           <GestureDetector gesture={Gesture.Exclusive(logoLongPress, logoTap)}>
             <Animated.View
+              data-testid="logo-button"
               style={[
                 styles.logoCircle,
-                {
-                  backgroundColor: logoGlowColor,
-                  transform: [{ scale: logoScale }],
-                },
+                { backgroundColor: logoGlowColor, transform: [{ scale: logoScale }] },
               ]}
             >
               <Text style={styles.logoText}>B</Text>
@@ -459,7 +401,7 @@ export default function Index() {
 
         {/* Instructions */}
         {!workoutState.isActive && (
-          <View style={styles.instructionsContainer}>
+          <View style={styles.instructionsContainer} data-testid="instructions">
             <Text style={styles.instructionsText}>
               Tap the logo to begin your Brutality workout
             </Text>
@@ -474,26 +416,26 @@ export default function Index() {
 
         {/* Complexity & Intensity Indicators */}
         {workoutState.isActive && (
-          <View style={styles.scoresContainer}>
+          <View style={styles.scoresContainer} data-testid="scores">
             <View style={styles.scoreItem}>
               <Text style={styles.scoreLabel}>Complexity</Text>
               <View style={styles.scoreBar}>
-                <View 
+                <View
                   style={[
-                    styles.scoreProgress, 
-                    { width: `${workoutState.complexityScore * 100}%` }
-                  ]} 
+                    styles.scoreProgress,
+                    { width: `${workoutState.complexityScore * 100}%` },
+                  ]}
                 />
               </View>
             </View>
             <View style={styles.scoreItem}>
               <Text style={styles.scoreLabel}>Intensity</Text>
               <View style={styles.scoreBar}>
-                <View 
+                <View
                   style={[
-                    styles.scoreProgress, 
-                    { width: `${workoutState.intensityScore * 100}%` }
-                  ]} 
+                    styles.scoreProgress,
+                    { width: `${workoutState.intensityScore * 100}%` },
+                  ]}
                 />
               </View>
             </View>
@@ -513,7 +455,7 @@ export default function Index() {
         onSpotifyConnect={handleSpotifyConnect}
         onSettings={handleSettings}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -568,14 +510,6 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     backgroundColor: '#FF6B35',
     opacity: 0.3,
-    shadowColor: '#FF6B35',
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 1,
-    shadowRadius: 20,
-    elevation: 20,
   },
   logoCircle: {
     width: 100,
@@ -584,14 +518,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#808080',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 8,
   },
   logoText: {
     color: '#000000',
@@ -640,86 +566,3 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 });
-
-  // Logo gesture handlers
-  const logoLongPress = Gesture.LongPress()
-    .minDuration(1000) // 1 second hold
-    .onStart(() => {
-      console.log('Long press started - showing menu');
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      } catch (error) {
-        console.log('Haptics not supported');
-      }
-      
-      // Enhanced animation during hold
-      Animated.parallel([
-        Animated.timing(logoScale, {
-          toValue: 1.2,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoGlow, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: false,
-        }),
-        Animated.timing(shadowOpacity, {
-          toValue: 0.8,
-          duration: 1000,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    })
-    .onEnd(() => {
-      console.log('Long press completed - showing hold menu');
-      setShowHoldMenu(true);
-      
-      // Reset animations
-      Animated.parallel([
-        Animated.timing(logoScale, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoGlow, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: false,
-        }),
-        Animated.timing(shadowOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    })
-    .onFinalize(() => {
-      // Reset if cancelled
-      Animated.parallel([
-        Animated.timing(logoScale, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(logoGlow, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: false,
-        }),
-        Animated.timing(shadowOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
-
-  const logoTap = Gesture.Tap()
-    .maxDuration(999) // Don't trigger if it becomes a long press
-    .onEnd(() => {
-      if (!workoutState.isActive && !showHoldMenu) {
-        console.log('Quick tap - starting workout');
-        startWorkout();
-      }
-    });

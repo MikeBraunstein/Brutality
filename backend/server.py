@@ -6,12 +6,10 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import base64
-import httpx
-import asyncio
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -199,57 +197,37 @@ async def generate_move_command(
 
 @api_router.post("/tts/generate", response_model=TTSResponse)
 async def generate_speech(request: TTSRequest):
-    """Generate text-to-speech audio using OpenAI TTS"""
+    """Generate text-to-speech audio. Returns use_browser_tts=true if no API key is configured."""
     try:
-        # Get the Emergent LLM key
-        EMERGENT_LLM_KEY = "sk-emergent-808612d9894D45735C"
-        
-        import httpx
-        
-        async with httpx.AsyncClient() as http_client:
-            response = await http_client.post(
-                "https://api.openai.com/v1/audio/speech",
-                headers={
-                    "Authorization": f"Bearer {EMERGENT_LLM_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "tts-1",
-                    "input": request.text,
-                    "voice": request.voice,
-                    "speed": request.speed,
-                    "response_format": "mp3"
-                },
-                timeout=30.0
+        openai_key = os.environ.get('OPENAI_API_KEY')
+        if openai_key:
+            import openai
+            client = openai.AsyncOpenAI(api_key=openai_key)
+            response = await client.audio.speech.create(
+                model="tts-1",
+                voice=request.voice,
+                input=request.text,
+                speed=request.speed,
             )
-            
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"OpenAI API error: {response.text}"
-                )
-            
-            # Convert audio to base64
-            audio_data = response.content
-            audio_base64 = base64.b64encode(audio_data).decode('utf-8')
-            
-            # Save TTS request to database
-            tts_record = {
-                "id": str(uuid.uuid4()),
-                "text": request.text,
-                "voice": request.voice,
-                "speed": request.speed,
-                "audio_base64": audio_base64,
-                "created_at": datetime.utcnow()
-            }
-            await db.tts_requests.insert_one(tts_record)
-            
-            return TTSResponse(
-                audio_base64=audio_base64,
-                text=request.text,
-                voice=request.voice
-            )
-        
+            audio_base64 = base64.b64encode(response.content).decode('utf-8')
+        else:
+            # No API key — return empty audio, frontend uses Web Speech API fallback
+            audio_base64 = ""
+
+        tts_record = {
+            "id": str(uuid.uuid4()),
+            "text": request.text,
+            "voice": request.voice,
+            "speed": request.speed,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.tts_requests.insert_one(tts_record)
+
+        return TTSResponse(
+            audio_base64=audio_base64,
+            text=request.text,
+            voice=request.voice,
+        )
     except Exception as e:
         logging.error(f"TTS error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generating speech: {str(e)}")

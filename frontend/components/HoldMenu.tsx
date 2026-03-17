@@ -1,21 +1,21 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
   withTiming,
-  runOnJS,
 } from 'react-native-reanimated';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');
 
 interface MenuOption {
   id: string;
   title: string;
-  icon: React.ReactNode;
+  iconName: string;
+  iconFamily: 'ionicons' | 'material' | 'fontawesome5';
   action: () => void;
   color: string;
 }
@@ -32,6 +32,12 @@ interface HoldMenuProps {
   onSettings: () => void;
 }
 
+const MenuIcon = ({ family, name }: { family: string; name: string }) => {
+  if (family === 'material') return <MaterialIcons name={name as any} size={24} color="#FFFFFF" />;
+  if (family === 'fontawesome5') return <FontAwesome5 name={name as any} size={24} color="#FFFFFF" />;
+  return <Ionicons name={name as any} size={24} color="#FFFFFF" />;
+};
+
 const HoldMenu: React.FC<HoldMenuProps> = ({
   isVisible,
   onClose,
@@ -46,76 +52,60 @@ const HoldMenu: React.FC<HoldMenuProps> = ({
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0);
 
-  // Create menu options
   const menuOptions: MenuOption[] = [
     {
       id: 'settings',
       title: 'Settings',
-      icon: <Ionicons name="settings" size={24} color="#FFFFFF" />,
+      iconName: 'settings',
+      iconFamily: 'ionicons',
       color: '#4A90E2',
-      action: () => {
-        runOnJS(onSettings)();
-        runOnJS(onClose)();
-      }
+      action: () => { onSettings(); onClose(); },
     },
     {
       id: 'spotify',
       title: 'Spotify',
-      icon: <FontAwesome5 name="spotify" size={24} color="#FFFFFF" />,
+      iconName: 'spotify',
+      iconFamily: 'fontawesome5',
       color: '#1DB954',
-      action: () => {
-        runOnJS(onSpotifyConnect)();
-        runOnJS(onClose)();
-      }
+      action: () => { onSpotifyConnect(); onClose(); },
     },
-    ...(isWorkoutActive ? [
-      {
-        id: 'pause',
-        title: 'Pause',
-        icon: <Ionicons name="pause-circle" size={24} color="#FFFFFF" />,
-        color: '#FF6B35',
-        action: () => {
-          runOnJS(onPause)();
-          runOnJS(onClose)();
-        }
-      },
-      {
-        id: 'advance',
-        title: 'Next Round',
-        icon: <MaterialIcons name="fast-forward" size={24} color="#FFFFFF" />,
-        color: '#7ED321',
-        action: () => {
-          runOnJS(onAdvanceRound)();
-          runOnJS(onClose)();
-        }
-      },
-      {
-        id: 'repeat',
-        title: 'Repeat Round',
-        icon: <MaterialIcons name="repeat" size={24} color="#FFFFFF" />,
-        color: '#BD10E0',
-        action: () => {
-          runOnJS(onRepeatRound)();
-          runOnJS(onClose)();
-        }
-      }
-    ] : [])
+    ...(isWorkoutActive
+      ? [
+          {
+            id: 'pause',
+            title: 'Pause',
+            iconName: 'pause-circle',
+            iconFamily: 'ionicons' as const,
+            color: '#FF6B35',
+            action: () => { onPause(); onClose(); },
+          },
+          {
+            id: 'advance',
+            title: 'Next Round',
+            iconName: 'fast-forward',
+            iconFamily: 'material' as const,
+            color: '#7ED321',
+            action: () => { onAdvanceRound(); onClose(); },
+          },
+          {
+            id: 'repeat',
+            title: 'Repeat Round',
+            iconName: 'repeat',
+            iconFamily: 'material' as const,
+            color: '#BD10E0',
+            action: () => { onRepeatRound(); onClose(); },
+          },
+        ]
+      : []),
   ];
 
   useEffect(() => {
     if (isVisible) {
-      // Add error handling for haptics on web platform
-      try {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      } catch (error) {
-        // Haptics not supported on web, silently continue
-        console.log('Haptics not supported on this platform');
+      if (Platform.OS !== 'web') {
+        try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (_) {}
       }
       opacity.value = withTiming(1, { duration: 300 });
-      scale.value = withSpring(1, {
-        damping: 15,
-        stiffness: 150,
-      });
+      scale.value = withSpring(1, { damping: 15, stiffness: 150 });
     } else {
       opacity.value = withTiming(0, { duration: 200 });
       scale.value = withTiming(0, { duration: 200 });
@@ -127,20 +117,17 @@ const HoldMenu: React.FC<HoldMenuProps> = ({
     transform: [{ scale: scale.value }],
   }));
 
-  const handleBackdropPress = () => {
-    onClose();
-  };
-
   if (!isVisible) return null;
 
   return (
-    <View style={styles.overlay}>
-      <TouchableOpacity 
-        style={styles.backdrop} 
-        onPress={handleBackdropPress}
+    <View style={styles.overlay} data-testid="hold-menu">
+      <TouchableOpacity
+        style={styles.backdrop}
+        onPress={onClose}
         activeOpacity={1}
+        data-testid="hold-menu-backdrop"
       />
-      
+
       <Animated.View style={[styles.menuContainer, containerStyle]}>
         <View style={styles.menuHeader}>
           <Text style={styles.menuTitle}>Brutality Menu</Text>
@@ -150,25 +137,27 @@ const HoldMenu: React.FC<HoldMenuProps> = ({
         </View>
 
         <View style={styles.optionsGrid}>
-          {menuOptions.map((option, index) => (
+          {menuOptions.map((option) => (
             <TouchableOpacity
               key={option.id}
               style={[styles.menuOption, { backgroundColor: option.color }]}
               onPress={option.action}
               activeOpacity={0.8}
+              data-testid={`menu-option-${option.id}`}
             >
               <View style={styles.iconContainer}>
-                {option.icon}
+                <MenuIcon family={option.iconFamily} name={option.iconName} />
               </View>
               <Text style={styles.optionText}>{option.title}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.closeButton}
           onPress={onClose}
           activeOpacity={0.8}
+          data-testid="hold-menu-close"
         >
           <Ionicons name="close-circle" size={32} color="#FF6B35" />
           <Text style={styles.closeText}>Close</Text>
@@ -205,14 +194,6 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     borderWidth: 2,
     borderColor: '#FF6B35',
-    shadowColor: '#FF6B35',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
   },
   menuHeader: {
     alignItems: 'center',
@@ -236,19 +217,12 @@ const styles = StyleSheet.create({
   },
   menuOption: {
     width: screenWidth * 0.35,
+    maxWidth: 160,
     height: 80,
     borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
   iconContainer: {
     marginBottom: 5,
@@ -272,4 +246,3 @@ const styles = StyleSheet.create({
 });
 
 export default HoldMenu;
-export type { MenuOption };
