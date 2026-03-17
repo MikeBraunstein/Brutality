@@ -165,6 +165,8 @@ async def get_workout_session(session_id: str):
         if not session:
             raise HTTPException(status_code=404, detail="Workout session not found")
         return WorkoutSession(**session)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching workout: {str(e)}")
 
