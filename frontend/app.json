@@ -35,6 +35,7 @@
         }
       ],
       "expo-audio",
+      "expo-document-picker",
       "expo-font",
       "expo-video",
       "expo-web-browser"

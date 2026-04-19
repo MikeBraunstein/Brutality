@@ -6,15 +6,20 @@ import {
   Animated,
   Dimensions,
   Alert,
-  TouchableOpacity,
   Platform,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { BrutalityAPI } from '../services/api';
+import { speakCallout, stopSpeech, cleanForSpeech } from '../services/tts';
+import { useMusicPlayer } from '../services/musicPlayer';
+import { fetchLLMCallout, fetchMuscleInfo, fetchBreakTip, type MuscleInfoResponse } from '../services/llmApi';
 import HoldMenu from '../components/HoldMenu';
 
 const { width, height } = Dimensions.get('window');
+
+// How many times in a row the same command is allowed before forcing a rotation
+const MAX_REPEAT = 4;
 
 interface WorkoutState {
   isActive: boolean;
@@ -49,6 +54,7 @@ export default function Index() {
 
   const [showHoldMenu, setShowHoldMenu] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [muscleInfo, setMuscleInfo] = useState<MuscleInfoResponse | null>(null);
 
   // Animation values
   const logoScale = useRef(new Animated.Value(1)).current;
@@ -59,49 +65,194 @@ export default function Index() {
   const workoutTimer = useRef<any>(null);
   const moveTimer = useRef<any>(null);
 
-  // Move definitions
-  const moves: Record<number, string> = {
-    1: 'Left straight punch',
-    2: 'Right straight punch',
-    3: 'Left hook',
-    4: 'Right uppercut',
-  };
+  // ── Stale-closure guards ─────────────────────────────────────────────────
+  const workoutStateRef = useRef(workoutState);
+  const isPausedRef = useRef(isPaused);
+  const muscleInfoRef = useRef<MuscleInfoResponse | null>(null);
+  const callNextMoveRef = useRef<() => void>(() => {});
 
-  // Timer effect
+  useEffect(() => { workoutStateRef.current = workoutState; });
+  useEffect(() => { isPausedRef.current = isPaused; });
+
+  // ── Recent-move deduplication ─────────────────────────────────────────────
+  // Tracks the last 8 commands; refuses to schedule the same one >MAX_REPEAT times in a row
+  const recentMovesRef = useRef<string[]>([]);
+
+  function isOverused(cmd: string): boolean {
+    const tail = recentMovesRef.current.slice(-MAX_REPEAT);
+    return tail.length >= MAX_REPEAT && tail.every(c => c === cmd);
+  }
+
+  function recordMove(cmd: string): void {
+    recentMovesRef.current = [...recentMovesRef.current.slice(-7), cmd];
+  }
+
+  function pickAlternative(avoid: string): string {
+    const options = ['1', '2', '3', '4'].filter(d => d !== avoid.trim());
+    return options[Math.floor(Math.random() * options.length)] ?? '1';
+  }
+
+  // Music player
+  const { pickAndPlayMusic, duckMusic, unduckMusic, stopMusic, pauseMusic, resumeMusic, currentTrackName } = useMusicPlayer();
+
+  // ── Workout timer ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (workoutState.isActive && workoutState.timeRemaining > 0 && !isPaused) {
       workoutTimer.current = setTimeout(() => {
-        setWorkoutState(prev => ({
-          ...prev,
-          timeRemaining: prev.timeRemaining - 1,
-        }));
+        setWorkoutState(prev => ({ ...prev, timeRemaining: prev.timeRemaining - 1 }));
       }, 1000);
     } else if (workoutState.isActive && workoutState.timeRemaining === 0) {
       handleRoundComplete();
     }
-    return () => {
-      if (workoutTimer.current) clearTimeout(workoutTimer.current);
-    };
+    return () => { if (workoutTimer.current) clearTimeout(workoutTimer.current); };
   }, [workoutState.isActive, workoutState.timeRemaining, isPaused]);
 
+  // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       if (workoutTimer.current) clearTimeout(workoutTimer.current);
       if (moveTimer.current) clearTimeout(moveTimer.current);
+      stopSpeech();
+      stopMusic();
     };
   }, []);
+
+  // Keep callNextMoveRef pointing at the latest closure (runs every render)
+  useEffect(() => { callNextMoveRef.current = callNextMove; });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // callNextMove — fire-and-forget, timer-driven
+  // ─────────────────────────────────────────────────────────────────────────
+  function callNextMove() {
+    const state = workoutStateRef.current;
+    if (!state.isActive || state.isBreak || isPausedRef.current) return;
+
+    const { complexityScore, intensityScore, currentRound, currentMove } = state;
+
+    Promise.race([
+      fetchLLMCallout(complexityScore, intensityScore, currentRound, currentMove),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 3000)
+      ),
+    ])
+      .then(callout => {
+        let cmd = callout.command;
+        let dur = callout.duration_ms;
+
+        // Prevent the same command from repeating MAX_REPEAT times in a row
+        if (isOverused(cmd)) {
+          cmd = pickAlternative(cmd);
+          dur = (parseInt(cmd) || 2) * 1000 + 1500;
+        }
+        recordMove(cmd);
+        scheduleMove(cmd, dur);
+      })
+      .catch(() => {
+        // Network/timeout fallback: random local move
+        const n = Math.floor(Math.random() * 4) + 1;
+        const cmd = String(n);
+        if (isOverused(cmd)) {
+          const alt = pickAlternative(cmd);
+          recordMove(alt);
+          scheduleMove(alt, (parseInt(alt)) * 1000 + 1500);
+        } else {
+          recordMove(cmd);
+          scheduleMove(cmd, n * 1000 + 1500);
+        }
+      });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // scheduleMove — display + speak + queue next
+  // ─────────────────────────────────────────────────────────────────────────
+  function scheduleMove(command: string, duration_ms: number) {
+    setWorkoutState(prev => ({ ...prev, currentMove: command, moveTimeRemaining: duration_ms }));
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Fetch muscle info in background; update both state and ref
+    fetchMuscleInfo(command).then(info => {
+      if (info) {
+        setMuscleInfo(info);
+        muscleInfoRef.current = info;
+      }
+    });
+
+    // Speak using cleaned text (no dashes or commas)
+    duckMusic();
+    speakCallout({ text: cleanForSpeech(command), rate: 1.1, pitch: 0.75 });
+
+    // Complexity progression every 30 seconds
+    const state = workoutStateRef.current;
+    if (state.timeRemaining % 30 === 0 && state.timeRemaining > 0) {
+      setWorkoutState(prev => ({
+        ...prev,
+        complexityScore: Math.min(1.0, prev.complexityScore + 0.1),
+      }));
+    }
+
+    // Queue next move after duration
+    if (moveTimer.current) clearTimeout(moveTimer.current);
+    moveTimer.current = setTimeout(() => {
+      unduckMusic();
+      callNextMoveRef.current();
+    }, duration_ms);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // startBreak — announces rest, then speaks a conversational coaching tip
+  // ─────────────────────────────────────────────────────────────────────────
+  function startBreak(round: number, lastMove: string, lastInfo: MuscleInfoResponse | null) {
+    if (moveTimer.current) clearTimeout(moveTimer.current);
+    stopSpeech();
+    unduckMusic();
+
+    setWorkoutState(prev => ({
+      ...prev,
+      timeRemaining: 180,
+      isBreak: true,
+      currentMove: 'Rest.',
+    }));
+    setMuscleInfo(null);
+
+    // Fire-and-forget async coaching sequence during the break
+    (async () => {
+      duckMusic();
+
+      // Announce the break
+      await speakCallout({
+        text: `Round ${round} complete. Good work. Rest for three minutes.`,
+        rate: 0.9,
+        pitch: 0.68,
+      });
+
+      // Coaching tip — only when the last move is a real command
+      const skipWords = new Set(['rest.', 'paused', 'break time.', '']);
+      if (lastMove && !skipWords.has(lastMove.toLowerCase())) {
+        const tip = await fetchBreakTip(
+          lastMove,
+          lastInfo?.primary_muscles ?? [],
+          round,
+        );
+        if (tip) {
+          // Show tip on screen too
+          setWorkoutState(prev => ({ ...prev, currentMove: tip }));
+          await speakCallout({ text: tip, rate: 0.88, pitch: 0.65 });
+        }
+      }
+
+      unduckMusic();
+    })();
+  }
 
   const animateLogo = () => {
     Animated.sequence([
       Animated.timing(logoScale, { toValue: 1.2, duration: 200, useNativeDriver: true }),
       Animated.timing(logoScale, { toValue: 1, duration: 200, useNativeDriver: true }),
     ]).start();
-
     Animated.sequence([
       Animated.timing(logoGlow, { toValue: 1, duration: 300, useNativeDriver: false }),
       Animated.timing(logoGlow, { toValue: 0, duration: 700, useNativeDriver: false }),
     ]).start();
-
     Animated.sequence([
       Animated.timing(shadowOpacity, { toValue: 0.8, duration: 300, useNativeDriver: true }),
       Animated.timing(shadowOpacity, { toValue: 0, duration: 700, useNativeDriver: true }),
@@ -110,12 +261,8 @@ export default function Index() {
 
   const startWorkout = async () => {
     try {
-      console.log('Starting workout...');
       const session = await BrutalityAPI.startWorkoutSession('user_1');
-      console.log('Workout session started:', session.id);
-
       animateLogo();
-
       setWorkoutState(prev => ({
         ...prev,
         isActive: true,
@@ -125,11 +272,9 @@ export default function Index() {
         intensityScore: 0.1,
         sessionId: session.id,
       }));
-
+      recentMovesRef.current = [];
       await playWelcomeMessage();
-    } catch (error) {
-      console.error('Error starting workout:', error);
-      // Fallback: start workout locally without backend
+    } catch {
       animateLogo();
       setWorkoutState(prev => ({
         ...prev,
@@ -140,15 +285,20 @@ export default function Index() {
         intensityScore: 0.1,
         sessionId: 'local-session',
       }));
+      recentMovesRef.current = [];
       setTimeout(() => startRound(1), 2000);
     }
   };
 
   const handleRoundComplete = () => {
-    if (workoutState.currentRound >= 7) {
+    const state = workoutStateRef.current;
+
+    if (state.currentRound >= 7) {
       completeWorkout();
-    } else if (workoutState.isBreak) {
-      const nextRound = workoutState.currentRound + 1;
+    } else if (state.isBreak) {
+      // Break over — start next round
+      const nextRound = state.currentRound + 1;
+      recentMovesRef.current = [];
       setWorkoutState(prev => ({
         ...prev,
         currentRound: nextRound,
@@ -156,50 +306,53 @@ export default function Index() {
         isBreak: false,
         complexityScore: 0.0,
         intensityScore: Math.min(1.0, prev.intensityScore + 0.1),
+        currentMove: `Round ${nextRound}`,
       }));
       startRound(nextRound);
     } else {
-      setWorkoutState(prev => ({
-        ...prev,
-        timeRemaining: 180,
-        isBreak: true,
-        currentMove: 'Break time! Rest and hydrate.',
-      }));
+      // Round over — start break with coaching
+      startBreak(state.currentRound, state.currentMove, muscleInfoRef.current);
     }
   };
 
   const completeWorkout = async () => {
+    if (moveTimer.current) clearTimeout(moveTimer.current);
+    stopSpeech();
     try {
-      if (workoutState.sessionId && workoutState.sessionId !== 'local-session') {
-        await BrutalityAPI.completeWorkoutSession(workoutState.sessionId);
+      if (workoutStateRef.current.sessionId !== 'local-session') {
+        await BrutalityAPI.completeWorkoutSession(workoutStateRef.current.sessionId!);
       }
-      setWorkoutState(prev => ({
-        ...prev,
-        isActive: false,
-        currentMove: 'Workout Complete! Great job!',
-      }));
-      setIsPaused(false);
-      Alert.alert('Congratulations!', 'You have completed the Brutality workout!');
-    } catch (error) {
-      console.error('Error completing workout:', error);
-    }
+    } catch { /* non-critical */ }
+    setWorkoutState(prev => ({ ...prev, isActive: false, currentMove: 'Workout complete.' }));
+    setIsPaused(false);
+    Alert.alert('Congratulations', 'You completed the Brutality workout.');
   };
 
-  // Menu handlers
   const handlePause = () => {
-    setIsPaused(p => !p);
+    const nowPaused = !isPausedRef.current;
+    setIsPaused(nowPaused);
     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    if (!isPaused) {
-      setWorkoutState(prev => ({ ...prev, currentMove: 'Workout Paused' }));
+
+    if (nowPaused) {
+      if (moveTimer.current) clearTimeout(moveTimer.current);
+      stopSpeech();
+      unduckMusic();
+      pauseMusic();
+      setWorkoutState(prev => ({ ...prev, currentMove: 'Paused' }));
     } else {
-      setTimeout(() => callNextMove(), 1000);
+      resumeMusic();
+      setTimeout(() => callNextMoveRef.current(), 1000);
     }
   };
 
   const handleAdvanceRound = () => {
-    if (workoutState.currentRound < 7) {
+    const round = workoutStateRef.current.currentRound;
+    if (round < 7) {
       triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-      const nextRound = workoutState.currentRound + 1;
+      if (moveTimer.current) clearTimeout(moveTimer.current);
+      stopSpeech();
+      recentMovesRef.current = [];
+      const nextRound = round + 1;
       setWorkoutState(prev => ({
         ...prev,
         currentRound: nextRound,
@@ -207,117 +360,65 @@ export default function Index() {
         isBreak: false,
         complexityScore: 0.0,
         intensityScore: Math.min(1.0, prev.intensityScore + 0.1),
-        currentMove: `Starting Round ${nextRound}...`,
+        currentMove: `Round ${nextRound}`,
       }));
       setIsPaused(false);
-      setTimeout(() => startRound(nextRound), 2000);
+      setTimeout(() => startRound(nextRound), 1500);
     } else {
-      Alert.alert('Final Round', 'You are already on the final round!');
+      Alert.alert('Final Round', 'You are already on the final round.');
     }
   };
 
   const handleRepeatRound = () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    if (moveTimer.current) clearTimeout(moveTimer.current);
+    stopSpeech();
+    recentMovesRef.current = [];
+    const round = workoutStateRef.current.currentRound;
     setWorkoutState(prev => ({
       ...prev,
       timeRemaining: 300,
       isBreak: false,
       complexityScore: 0.0,
-      currentMove: `Repeating Round ${prev.currentRound}...`,
+      currentMove: `Round ${round}`,
     }));
     setIsPaused(false);
-    setTimeout(() => startRound(workoutState.currentRound), 2000);
+    setTimeout(() => startRound(round), 1500);
   };
 
-  const handleSpotifyConnect = () => {
-    Alert.alert(
-      'Spotify Integration',
-      'Spotify integration coming soon! Connect your account to stream workout music.',
-      [{ text: 'OK' }]
-    );
+  const handleMusicPick = async () => {
+    const track = await pickAndPlayMusic();
+    if (track) triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const handleSettings = () => {
     Alert.alert(
       'Settings',
-      'Settings menu coming soon!\n\n• Workout preferences\n• Audio settings\n• Profile customization',
+      'Coming soon:\n• Voice speed & pitch\n• Round duration\n• Intensity preset',
       [{ text: 'OK' }]
     );
   };
 
   const playWelcomeMessage = async () => {
-    try {
-      const welcomeText = 'Welcome to Brutality, an exercise routine not for the faint of heart.';
-      console.log('Playing welcome message:', welcomeText);
-
-      try {
-        await BrutalityAPI.generateTTS({ text: welcomeText, voice: 'onyx', speed: 1.0 });
-        console.log('TTS generated successfully');
-      } catch (error) {
-        console.error('TTS generation failed:', error);
-      }
-
-      setTimeout(() => startRound(1), 4000);
-    } catch (error) {
-      console.error('Error playing welcome message:', error);
-    }
+    duckMusic();
+    await speakCallout({
+      text: 'Welcome to Brutality. An exercise routine not for the faint of heart.',
+      rate: 0.95,
+      pitch: 0.7,
+      onDone: unduckMusic,
+    });
+    setTimeout(() => startRound(1), 500);
   };
 
   const startRound = (roundNumber: number) => {
-    console.log(`Starting round ${roundNumber}`);
-    setTimeout(() => callNextMove(), 2000);
+    setTimeout(() => callNextMoveRef.current(), 1500);
   };
 
-  const callNextMove = async () => {
-    if (!workoutState.isActive || workoutState.isBreak) return;
-
-    try {
-      const moveCommand = await BrutalityAPI.generateMoveCommand(
-        workoutState.complexityScore,
-        workoutState.intensityScore,
-        workoutState.currentRound
-      );
-
-      console.log(`Instructor calls: ${moveCommand.command}`);
-
-      try {
-        await BrutalityAPI.generateTTS({ text: moveCommand.command, voice: 'onyx', speed: 1.2 });
-      } catch (error) {
-        console.error('Move TTS generation failed:', error);
-      }
-
-      setWorkoutState(prev => ({
-        ...prev,
-        currentMove: moveCommand.command,
-        moveTimeRemaining: moveCommand.duration_ms,
-      }));
-
-      if (workoutState.timeRemaining % 30 === 0) {
-        setWorkoutState(prev => ({
-          ...prev,
-          complexityScore: Math.min(1.0, prev.complexityScore + 0.1),
-        }));
-      }
-
-      moveTimer.current = setTimeout(() => callNextMove(), moveCommand.duration_ms);
-    } catch (error) {
-      console.error('Error generating move command:', error);
-      // Fallback: generate a local move
-      const localMoveNum = Math.floor(Math.random() * 4) + 1;
-      setWorkoutState(prev => ({
-        ...prev,
-        currentMove: `${localMoveNum}`,
-      }));
-      moveTimer.current = setTimeout(() => callNextMove(), 3000);
-    }
-  };
-
-  // ── Gesture handlers (MUST be inside the component) ──
+  // ── Gesture handlers ──────────────────────────────────────────────────────
   const logoLongPress = Gesture.LongPress()
     .minDuration(1000)
     .onStart(() => {
       triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
-
       Animated.parallel([
         Animated.timing(logoScale, { toValue: 1.2, duration: 1000, useNativeDriver: true }),
         Animated.timing(logoGlow, { toValue: 1, duration: 1000, useNativeDriver: false }),
@@ -325,9 +426,7 @@ export default function Index() {
       ]).start();
     })
     .onEnd(() => {
-      console.log('Long press completed - showing hold menu');
       setShowHoldMenu(true);
-
       Animated.parallel([
         Animated.timing(logoScale, { toValue: 1, duration: 300, useNativeDriver: true }),
         Animated.timing(logoGlow, { toValue: 0, duration: 300, useNativeDriver: false }),
@@ -345,8 +444,7 @@ export default function Index() {
   const logoTap = Gesture.Tap()
     .maxDuration(999)
     .onEnd(() => {
-      if (!workoutState.isActive && !showHoldMenu) {
-        console.log('Quick tap - starting workout');
+      if (!workoutStateRef.current.isActive && !showHoldMenu) {
         startWorkout();
       }
     });
@@ -359,18 +457,30 @@ export default function Index() {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        {/* Workout Status */}
+        {/* Workout status */}
         {workoutState.isActive && (
-          <View style={styles.statusContainer} data-testid="workout-status">
-            <Text style={styles.statusText}>
-              Round {workoutState.currentRound}/7
-            </Text>
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusText}>Round {workoutState.currentRound}/7</Text>
             <Text style={styles.timerText}>
               {Math.floor(workoutState.timeRemaining / 60)}:
               {(workoutState.timeRemaining % 60).toString().padStart(2, '0')}
             </Text>
             {workoutState.currentMove ? (
-              <Text style={styles.moveText}>{workoutState.currentMove}</Text>
+              <Text style={[
+                styles.moveText,
+                workoutState.isBreak && styles.moveTextBreak,
+              ]}>
+                {workoutState.currentMove}
+              </Text>
+            ) : null}
+            {/* Primary muscles — shown during active moves only */}
+            {muscleInfo && !workoutState.isBreak && (
+              <Text style={styles.muscleText}>
+                {muscleInfo.primary_muscles.join(' · ')}
+              </Text>
+            )}
+            {currentTrackName ? (
+              <Text style={styles.trackText}>♫ {currentTrackName}</Text>
             ) : null}
           </View>
         )}
@@ -388,7 +498,6 @@ export default function Index() {
 
           <GestureDetector gesture={Gesture.Exclusive(logoLongPress, logoTap)}>
             <Animated.View
-              data-testid="logo-button"
               style={[
                 styles.logoCircle,
                 { backgroundColor: logoGlowColor, transform: [{ scale: logoScale }] },
@@ -399,60 +508,47 @@ export default function Index() {
           </GestureDetector>
         </View>
 
-        {/* Instructions */}
+        {/* Pre-workout instructions */}
         {!workoutState.isActive && (
-          <View style={styles.instructionsContainer} data-testid="instructions">
-            <Text style={styles.instructionsText}>
-              Tap the logo to begin your Brutality workout
-            </Text>
-            <Text style={styles.instructionsSubtext}>
-              7 rounds • 5 minutes each • 3 minute breaks
-            </Text>
-            <Text style={styles.instructionsSubtext}>
-              Hold logo for menu options
-            </Text>
+          <View style={styles.instructionsContainer}>
+            <Text style={styles.instructionsText}>Tap to begin your Brutality workout</Text>
+            <Text style={styles.instructionsSubtext}>7 rounds · 5 min each · 3 min breaks</Text>
+            <Text style={styles.instructionsSubtext}>Hold logo for menu</Text>
+            {currentTrackName ? (
+              <Text style={styles.trackText}>♫ {currentTrackName}</Text>
+            ) : null}
           </View>
         )}
 
-        {/* Complexity & Intensity Indicators */}
+        {/* Progress bars */}
         {workoutState.isActive && (
-          <View style={styles.scoresContainer} data-testid="scores">
+          <View style={styles.scoresContainer}>
             <View style={styles.scoreItem}>
               <Text style={styles.scoreLabel}>Complexity</Text>
               <View style={styles.scoreBar}>
-                <View
-                  style={[
-                    styles.scoreProgress,
-                    { width: `${workoutState.complexityScore * 100}%` },
-                  ]}
-                />
+                <View style={[styles.scoreProgress, { width: `${workoutState.complexityScore * 100}%` }]} />
               </View>
             </View>
             <View style={styles.scoreItem}>
               <Text style={styles.scoreLabel}>Intensity</Text>
               <View style={styles.scoreBar}>
-                <View
-                  style={[
-                    styles.scoreProgress,
-                    { width: `${workoutState.intensityScore * 100}%` },
-                  ]}
-                />
+                <View style={[styles.scoreProgress, { width: `${workoutState.intensityScore * 100}%` }]} />
               </View>
             </View>
           </View>
         )}
       </View>
 
-      {/* Hold Menu */}
       <HoldMenu
         isVisible={showHoldMenu}
         onClose={() => setShowHoldMenu(false)}
         isWorkoutActive={workoutState.isActive}
+        isPaused={isPaused}
         currentRound={workoutState.currentRound}
         onPause={handlePause}
         onAdvanceRound={handleAdvanceRound}
         onRepeatRound={handleRepeatRound}
-        onSpotifyConnect={handleSpotifyConnect}
+        onMusicPick={handleMusicPick}
         onSettings={handleSettings}
       />
     </View>
@@ -474,25 +570,52 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 50,
     alignItems: 'center',
+    paddingHorizontal: 24,
   },
   statusText: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    color: '#555555',
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 3,
+    marginBottom: 6,
+    textTransform: 'uppercase',
   },
   timerText: {
     color: '#FF6B35',
-    fontSize: 48,
+    fontSize: 52,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 16,
+    letterSpacing: 2,
   },
   moveText: {
     color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: '700',
     textAlign: 'center',
-    paddingHorizontal: 20,
+    letterSpacing: 1,
+  },
+  // Break coaching tip is smaller and dimmer — it's a longer sentence
+  moveTextBreak: {
+    fontSize: 15,
+    fontWeight: '400',
+    color: '#CCCCCC',
+    lineHeight: 22,
+  },
+  muscleText: {
+    color: '#FF6B35',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 6,
+    opacity: 0.55,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  trackText: {
+    color: '#333333',
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 8,
+    letterSpacing: 0.5,
   },
   logoContainer: {
     alignItems: 'center',
@@ -505,11 +628,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   shadowCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
     backgroundColor: '#FF6B35',
-    opacity: 0.3,
+    opacity: 0.2,
   },
   logoCircle: {
     width: 100,
@@ -528,41 +651,45 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 100,
     alignItems: 'center',
+    gap: 6,
   },
   instructionsText: {
-    color: '#FFFFFF',
-    fontSize: 18,
+    color: '#CCCCCC',
+    fontSize: 16,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 4,
   },
   instructionsSubtext: {
-    color: '#808080',
-    fontSize: 14,
+    color: '#444444',
+    fontSize: 13,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   scoresContainer: {
     position: 'absolute',
-    bottom: 50,
+    bottom: 44,
     width: '100%',
     paddingHorizontal: 20,
   },
   scoreItem: {
-    marginBottom: 15,
+    marginBottom: 12,
   },
   scoreLabel: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginBottom: 5,
+    color: '#444444',
+    fontSize: 10,
+    marginBottom: 4,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
   scoreBar: {
-    height: 6,
-    backgroundColor: '#333333',
-    borderRadius: 3,
+    height: 2,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 1,
     overflow: 'hidden',
   },
   scoreProgress: {
     height: '100%',
     backgroundColor: '#FF6B35',
-    borderRadius: 3,
+    borderRadius: 1,
   },
 });
