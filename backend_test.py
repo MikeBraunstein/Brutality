@@ -12,9 +12,12 @@ from datetime import datetime
 import uuid
 
 # Get backend URL from frontend .env
-BACKEND_URL = "https://boxing-beats.preview.emergentagent.com/api"
+BACKEND_URL = "https://brutality-rounds.preview.emergentagent.com/api"
 
 class BrutalityBackendTester:
+    '''
+    Class to simulate the Brutality Workout App and its modules
+    '''
     def __init__(self):
         self.session = requests.Session()
         self.test_results = []
